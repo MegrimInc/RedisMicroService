@@ -1,0 +1,106 @@
+package edu.help.service;
+
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+
+import edu.help.model.OrderRequest;
+import edu.help.model.OrderResponse;
+import edu.help.model.OrderResponse.DrinkOrder;
+
+@Service
+public class RedisService {
+
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final RestTemplate restTemplate;
+
+    public RedisService(RedisTemplate<String, Object> redisTemplate, RestTemplate restTemplate) {
+        this.redisTemplate = redisTemplate;
+        this.restTemplate = restTemplate;
+    }
+
+    public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
+        System.out.println("Processing order for barId: " + orderRequest.getBarId());
+        System.out.println("Order Request sent to PostgreSQL: " + orderRequest);
+
+    
+        // Check if the key already exists in Redis
+        String orderKey = generateOrderKey(orderRequest);
+        if (redisTemplate.hasKey(orderKey)) {
+            sendResponse(session, "Order already in progress for barId: " + orderRequest.getBarId());
+            return;
+        }
+    
+        // Try to process the order with PostgreSQL
+        try {
+            OrderResponse orderResponse = restTemplate.postForObject(
+                "http://localhost:8080/" + orderRequest.getBarId() + "/processOrder",
+                orderRequest,
+                OrderResponse.class
+            );
+            System.out.println("Received OrderResponse: " + orderResponse);
+    
+            if (orderResponse != null) {
+                if ("Bar is closed".equals(orderResponse.getMessage())) {
+                    // If the bar is closed, send a message back to the client and return
+                    sendResponse(session, "Bar is closed. Please try again later.");
+                    session.close();
+                    return;
+                }
+    
+                // Prepare the data to store in Redis
+                Map<String, Object> orderData = new HashMap<>();
+                orderData.put("status", "unready");
+                orderData.put("user_id", orderRequest.getUserId());
+                
+                // Formatting the drinks as a map of drinkId -> drinkName,quantity
+                Map<String, String> drinksMap = new HashMap<>();
+                for (DrinkOrder drink : orderResponse.getDrinks()) {
+                    drinksMap.put(String.valueOf(drink.getDrinkId()), drink.getDrinkName() + "," + drink.getQuantity());
+                }
+                orderData.put("drinks", drinksMap);
+                
+                orderData.put("total_price", orderResponse.getTotalPrice());
+                orderData.put("timestamp", getCurrentTimestamp());
+    
+                // Store the order in Redis
+                redisTemplate.opsForHash().putAll(orderKey, orderData);
+                System.out.println("Stored order in Redis with key: " + orderKey);
+    
+                // Send a response back to the client
+                sendResponse(session, "Order processed: " + orderResponse.getMessage());
+            } else {
+                sendResponse(session, "Failed to process order: No response from PostgreSQL.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendResponse(session, "Failed to process order: " + e.getMessage());
+        }
+    }
+    
+
+    private String generateOrderKey(OrderRequest orderRequest) {
+        return String.format("%d.%d", orderRequest.getBarId(), orderRequest.getUserId());
+    }
+
+    private void sendResponse(WebSocketSession session, String message) {
+        try {
+            session.sendMessage(new TextMessage(message));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String getCurrentTimestamp() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        return LocalDateTime.now().format(formatter);
+    }
+}
