@@ -42,7 +42,7 @@ public class RedisService {
         // Try to process the order with PostgreSQL
         try {
             OrderResponse orderResponse = restTemplate.postForObject(
-                "http://localhost:8080/" + orderRequest.getBarId() + "/processOrder",
+                "http://34.230.32.169:8080/" + orderRequest.getBarId() + "/processOrder",
                 orderRequest,
                 OrderResponse.class
             );
