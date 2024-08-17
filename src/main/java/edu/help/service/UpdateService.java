@@ -19,9 +19,9 @@ import org.springframework.web.socket.WebSocketSession;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import edu.help.model.OrderRequest;
-import edu.help.model.OrderResponse;
-import edu.help.model.OrderResponse.DrinkOrder;
+import edu.help.dto.OrderRequest;
+import edu.help.dto.OrderResponse;
+import edu.help.dto.OrderResponse.DrinkOrder;
 
 @Service
 public class UpdateService {
