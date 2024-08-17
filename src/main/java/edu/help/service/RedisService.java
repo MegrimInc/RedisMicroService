@@ -12,6 +12,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import edu.help.model.OrderRequest;
 import edu.help.model.OrderResponse;
 import edu.help.model.OrderResponse.DrinkOrder;
@@ -21,6 +23,7 @@ public class RedisService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
 
     public RedisService(RedisTemplate<String, Object> redisTemplate, RestTemplate restTemplate) {
@@ -114,4 +117,33 @@ public class RedisService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         return LocalDateTime.now().format(formatter);
     }
+
+    public void set(String key, String jsonValue) {
+        redisTemplate.opsForValue().set(key, jsonValue);
+    }
+
+
+
+
+    public void storeSession(String barId, String bartenderID, WebSocketSession session) {
+        try {
+            Map<String, Object> valueMap = new HashMap<>();
+            valueMap.put("sessionId", session.getId()); // Store session ID or other relevant info
+            valueMap.put("active", true); // Boolean value
+
+            String redisKey = barId + "." + bartenderID;
+            String redisValueJson = objectMapper.writeValueAsString(valueMap);
+
+            set(redisKey, redisValueJson);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+
+
+
+
+   
 }
