@@ -23,4 +23,11 @@ public class WebSocketConfig implements WebSocketConfigurer {
         registry.addHandler(orderWebSocketHandler, "/ws/orders")
                 .setAllowedOrigins("*");
     }
+
+    @SuppressWarnings("null")
+    @Override
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(orderWebSocketHandler, "/ws/bartenders")
+                .setAllowedOrigins("*");
+    }
 }
