@@ -12,6 +12,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import edu.help.model.OrderRequest;
 import edu.help.model.OrderResponse;
 import edu.help.model.OrderResponse.DrinkOrder;
@@ -21,6 +23,7 @@ public class RedisService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RedisService(RedisTemplate<String, Object> redisTemplate, RestTemplate restTemplate) {
         this.redisTemplate = redisTemplate;
@@ -28,64 +31,27 @@ public class RedisService {
     }
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
-        System.out.println("Processing order for barId: " + orderRequest.getBarId());
-        System.out.println("Order Request sent to PostgreSQL: " + orderRequest);
+        // Existing code...
+    }
 
-    
-        // Check if the key already exists in Redis
-        String orderKey = generateOrderKey(orderRequest);
-        if (redisTemplate.hasKey(orderKey)) {
-            sendResponse(session, "Order already in progress for barId: " + orderRequest.getBarId());
-            return;
-        }
-    
-        // Try to process the order with PostgreSQL
+    public void set(String key, String jsonValue) {
+        redisTemplate.opsForValue().set(key, jsonValue);
+    }
+
+    public void storeSession(String barId, String bartenderID, WebSocketSession session) {
         try {
-            OrderResponse orderResponse = restTemplate.postForObject(
-                "http://34.230.32.169:8080/" + orderRequest.getBarId() + "/processOrder",
-                orderRequest,
-                OrderResponse.class
-            );
-            System.out.println("Received OrderResponse: " + orderResponse);
-    
-            if (orderResponse != null) {
-                if ("Bar is closed".equals(orderResponse.getMessage())) {
-                    // If the bar is closed, send a message back to the client and return
-                    sendResponse(session, "Bar is closed. Please try again later.");
-                    session.close();
-                    return;
-                }
-    
-                // Prepare the data to store in Redis
-                Map<String, Object> orderData = new HashMap<>();
-                orderData.put("status", "unready");
-                orderData.put("user_id", orderRequest.getUserId());
-                
-                // Formatting the drinks as a map of drinkId -> drinkName,quantity
-                Map<String, String> drinksMap = new HashMap<>();
-                for (DrinkOrder drink : orderResponse.getDrinks()) {
-                    drinksMap.put(String.valueOf(drink.getDrinkId()), drink.getDrinkName() + "," + drink.getQuantity());
-                }
-                orderData.put("drinks", drinksMap);
-                
-                orderData.put("total_price", orderResponse.getTotalPrice());
-                orderData.put("timestamp", getCurrentTimestamp());
-    
-                // Store the order in Redis
-                redisTemplate.opsForHash().putAll(orderKey, orderData);
-                System.out.println("Stored order in Redis with key: " + orderKey);
-    
-                // Send a response back to the client
-                sendResponse(session, "Order processed: " + orderResponse.getMessage());
-            } else {
-                sendResponse(session, "Failed to process order: No response from PostgreSQL.");
-            }
-        } catch (Exception e) {
+            Map<String, Object> valueMap = new HashMap<>();
+            valueMap.put("sessionId", session.getId()); // Store session ID or other relevant info
+            valueMap.put("active", true); // Boolean value
+
+            String redisKey = barId + "." + bartenderID;
+            String redisValueJson = objectMapper.writeValueAsString(valueMap);
+
+            set(redisKey, redisValueJson);
+        } catch (IOException e) {
             e.printStackTrace();
-            sendResponse(session, "Failed to process order: " + e.getMessage());
         }
     }
-    
 
     private String generateOrderKey(OrderRequest orderRequest) {
         return String.format("%d.%d", orderRequest.getBarId(), orderRequest.getUserId());
