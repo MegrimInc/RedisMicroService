@@ -5,8 +5,10 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+
 @Component
 public class BartenderWebSocketHandler extends TextWebSocketHandler {
+    private final RedisService redisService;
 
 @Override
 protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
