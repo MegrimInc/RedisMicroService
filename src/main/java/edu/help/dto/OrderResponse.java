@@ -1,4 +1,4 @@
-package edu.help.model;
+package edu.help.dto;
 
 import java.util.List;
 
@@ -7,11 +7,26 @@ public class OrderResponse {
     private String message;
     private double totalPrice;
     private List<DrinkOrder> drinks;
+    private String messageType;
 
+    public OrderResponse() {
+        // Default constructor
+    }
+
+    // Constructor with messageType
+    public OrderResponse(String message, double totalPrice, List<DrinkOrder> drinks, String messageType) {
+        this.message = message;
+        this.totalPrice = totalPrice;
+        this.drinks = drinks;
+        this.messageType = messageType;
+    }
+
+    // Constructor without messageType (for backward compatibility)
     public OrderResponse(String message, double totalPrice, List<DrinkOrder> drinks) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.drinks = drinks;
+        this.messageType = ""; // Default value if messageType is not provided
     }
 
     // Getters and Setters
@@ -37,6 +52,14 @@ public class OrderResponse {
 
     public void setDrinks(List<DrinkOrder> drinks) {
         this.drinks = drinks;
+    }
+
+    public String getMessageType() {
+        return messageType;
+    }
+
+    public void setMessageType(String messageType) {
+        this.messageType = messageType;
     }
 
     // Inner class representing a drink order

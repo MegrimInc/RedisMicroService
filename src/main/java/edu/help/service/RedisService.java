@@ -3,20 +3,22 @@ package edu.help.service;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import edu.help.model.OrderRequest;
-import edu.help.model.OrderResponse;
-import edu.help.model.OrderResponse.DrinkOrder;
+import edu.help.dto.OrderRequest;
+import edu.help.dto.OrderResponse;
+import edu.help.dto.OrderResponse.DrinkOrder;
 
 @Service
 public class RedisService {
@@ -34,14 +36,19 @@ public class RedisService {
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
-        System.out.println("Order Request sent to PostgreSQL: " + orderRequest);
+        System.out.println("Redis expects: " + Arrays.toString(OrderResponse.class.getDeclaredFields()));
 
     
         // Check if the key already exists in Redis
         String orderKey = generateOrderKey(orderRequest);
         if (redisTemplate.hasKey(orderKey)) {
             System.out.println("This is the orderKey: " + orderKey);
-            sendResponse(session, "Order already in progress for barId: " + orderRequest.getBarId());
+            sendResponse(session, new OrderResponse(
+            "Order already in progress for barId: " + orderRequest.getBarId(),
+            0.0,
+            null,
+            "" // Corrected messageType
+        ));
             System.out.println("Attempting to close WebSocket session for orderKey: " + orderKey);
            
             try {
@@ -61,13 +68,16 @@ public class RedisService {
                 OrderResponse.class
             );
             System.out.println("Received OrderResponse: " + orderResponse);
-    
+           
             if (orderResponse != null) {
                 if ("Bar is closed".equals(orderResponse.getMessage())) {
                     // If the bar is closed, send a message back to the client and return
-                    sendResponse(session, "Bar is closed. Please try again later.");
-                    session.close();
-                    return;
+                    sendResponse(session, new OrderResponse(
+                        "Bar is closed. Please try again later.",
+                        0.0,
+                        null,
+                        "" // Using "update" for bar closure
+                    ));
                 }
     
                 // Prepare the data to store in Redis
@@ -89,14 +99,32 @@ public class RedisService {
                 redisTemplate.opsForHash().putAll(orderKey, orderData);
                 System.out.println("Stored order in Redis with key: " + orderKey);
     
-                // Send a response back to the client
-                sendResponse(session, "Order processed: " + orderResponse.getMessage());
-            } else {
-                sendResponse(session, "Failed to process order: No response from PostgreSQL.");
-            }
-        } catch (Exception e) {
+                sendResponse(session, new OrderResponse(
+                    "Order processed: " + orderResponse.getMessage(),
+                    orderResponse.getTotalPrice(),
+                    orderResponse.getDrinks(),
+                    "success" // Using "success" to indicate successful processing
+                ));
+            } 
+        } catch (RestClientException e) {
             e.printStackTrace();
-            sendResponse(session, "Failed to process order: " + e.getMessage());
+            try {
+                // Send error response to the client
+                sendResponse(session, new OrderResponse(
+                    "Failed to process order: No response from PostgreSQL.",
+                    0.0,
+                    null,
+                    "error" // Using "error" to indicate a problem with processing
+                ));
+                
+                // Close the WebSocket session
+                if (session.isOpen()) {
+                    session.close();
+                    System.out.println("WebSocket session closed due to error.");
+                }
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
         }
     }
     
@@ -105,9 +133,10 @@ public class RedisService {
         return String.format("%d.%d", orderRequest.getBarId(), orderRequest.getUserId());
     }
 
-    private void sendResponse(WebSocketSession session, String message) {
+    private void sendResponse(WebSocketSession session, OrderResponse orderResponse) {
         try {
-            session.sendMessage(new TextMessage(message));
+            String jsonResponse = objectMapper.writeValueAsString(orderResponse);
+            session.sendMessage(new TextMessage(jsonResponse));
         } catch (IOException e) {
             e.printStackTrace();
         }

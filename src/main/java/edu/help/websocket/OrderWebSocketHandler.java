@@ -9,7 +9,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import edu.help.model.OrderRequest;
+import edu.help.dto.OrderRequest;
 import edu.help.service.RedisService;
 
 @Component
@@ -34,7 +34,10 @@ protected void handleTextMessage(WebSocketSession session, TextMessage message) 
 
         if (orderRequest != null) {
             // Pass the order to RedisService for processing
+            
             redisService.processOrder(orderRequest, session);
+            
+
         } else {
             sendErrorResponse(session, "Invalid order format.");
         }

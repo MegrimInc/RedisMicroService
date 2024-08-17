@@ -1,4 +1,4 @@
-package edu.help.model;
+package edu.help.dto;
 
 import java.util.List;
 
