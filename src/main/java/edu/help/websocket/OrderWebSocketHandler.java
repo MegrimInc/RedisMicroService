@@ -10,15 +10,15 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.OrderRequest;
-import edu.help.service.RedisService;
+import edu.help.service.OrderService;
 
 @Component
 public class OrderWebSocketHandler extends TextWebSocketHandler {
 
-    private final RedisService redisService;
+    private final OrderService redisService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public OrderWebSocketHandler(RedisService redisService) {
+    public OrderWebSocketHandler(OrderService redisService) {
         this.redisService = redisService;
     }
 
