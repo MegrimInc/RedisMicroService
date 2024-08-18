@@ -69,21 +69,26 @@ public class OrderService {
                     return;
                 }
 
-                 // Create Order object
-                 Order order = new Order(
+                // Create Order object
+                Order order = new Order(
                     orderRequest.getBarId(),
                     orderRequest.getUserId(),
                     orderResponse.getTotalPrice(),
                     convertDrinksToOrders(orderResponse.getDrinks()), // Use updated method
                     "unready",
-                    null, // Claimer could be set based on further logic
+                    "", // Claimer could be set based on further logic
                     getCurrentTimestamp() // Use updated method
                 );
 
-                // Store the order in Redis as JSON
-                String orderJson = objectMapper.writeValueAsString(order);
-                jedis.set(orderKey, orderJson);
+                // Serialize the order to JSON
+          
+            
+           
+
+                jedis.jsonSetWithEscape(orderKey, order);
                 System.out.println("Stored order in Redis with key: " + orderKey);
+                
+            
 
                 sendOrder(order, session);
             }
@@ -95,15 +100,7 @@ public class OrderService {
                 null,
                 "Failed to process order: No response from PostgreSQL."
             ));
-        } catch (IOException e) {
-            closeSession(session);
-            e.printStackTrace();
-            sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,
-                "Failed to process order: JSON conversion error."
-            ));
-        }
+        } 
     }
 
     private List<Order.DrinkOrder> convertDrinksToOrders(List<OrderResponse.DrinkOrder> drinkResponses) {
@@ -167,7 +164,6 @@ public class OrderService {
             e.printStackTrace();
         }
     }
-
 
     private String getCurrentTimestamp() {
         // Get current timestamp in milliseconds with date and time formatting
