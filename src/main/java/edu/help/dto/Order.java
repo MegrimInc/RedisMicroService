@@ -1,132 +1,138 @@
 package edu.help.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class Order {
-
-    @JsonProperty("barId")
     private int barId;
-
-    @JsonProperty("orderId")
-    private int orderId;
-
-    @JsonProperty("userId")
     private int userId;
-
-    @JsonProperty("price")
     private double price;
-
-    @JsonProperty("name")
-    private List<String> name;
-
-    @JsonProperty("orderState")
-    private String orderState;
-
-    @JsonProperty("claimer")
+    private List<DrinkOrder> drinks;
+    private String status;
     private String claimer;
+    private String timestamp;
 
-    @JsonProperty("timestamp")
-    private int timestamp; // Milliseconds since epoch
-
-    // Default constructor needed for Jackson
-    public Order() {}
-
-    public Order(int barId, int orderId, int userId, double price, List<String> name, String orderState, String claimer, int timestamp) {
+    public Order(int barId, int userId, double price, List<DrinkOrder> drinks, String status, String claimer, String timestamp) {
         this.barId = barId;
-        this.orderId = orderId;
         this.userId = userId;
         this.price = price;
-        this.name = name;
-        this.orderState = orderState;
+        this.drinks = drinks;
+        this.status = status;
         this.claimer = claimer;
         this.timestamp = timestamp;
     }
 
     // Getters and setters
+    @JsonProperty("barId")
     public int getBarId() {
         return barId;
     }
 
+    @JsonProperty("barId")
     public void setBarId(int barId) {
         this.barId = barId;
     }
 
-    public int getOrderId() {
-        return orderId;
-    }
-
-    public void setOrderId(int orderId) {
-        this.orderId = orderId;
-    }
-
+    @JsonProperty("userId")
     public int getUserId() {
         return userId;
     }
 
+    @JsonProperty("userId")
     public void setUserId(int userId) {
         this.userId = userId;
     }
 
+    @JsonProperty("price")
     public double getPrice() {
         return price;
     }
 
+    @JsonProperty("price")
     public void setPrice(double price) {
         this.price = price;
     }
 
-    public List<String> getName() {
-        return name;
+    @JsonProperty("drinks")
+    public List<DrinkOrder> getDrinks() {
+        return drinks;
     }
 
-    public void setName(List<String> name) {
-        this.name = name;
+    @JsonProperty("drinks")
+    public void setDrinks(List<DrinkOrder> drinks) {
+        this.drinks = drinks;
     }
 
-    public String getOrderState() {
-        return orderState;
+    @JsonProperty("status")
+    public String getStatus() {
+        return status;
     }
 
-    public void setOrderState(String orderState) {
-        this.orderState = orderState;
+    @JsonProperty("status")
+    public void setStatus(String status) {
+        this.status = status;
     }
 
+    @JsonProperty("claimer")
     public String getClaimer() {
         return claimer;
     }
 
+    @JsonProperty("claimer")
     public void setClaimer(String claimer) {
         this.claimer = claimer;
     }
 
-    public int getTimestamp() {
+    @JsonProperty("timestamp")
+    public String getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(int timestamp) {
+    @JsonProperty("timestamp")
+    public void setTimestamp(String timestamp) {
         this.timestamp = timestamp;
     }
 
-    // Method to convert an Order to JSON
-    public String toJson() throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.writeValueAsString(this);
-    }
+    public static class DrinkOrder {
+        private int id;
+        private String drinkName;
+        private int quantity;
 
-    // Static method to create an Order from JSON
-    public static Order fromJson(String json) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.readValue(json, Order.class);
-    }
+        public DrinkOrder(int id, String drinkName, int quantity) {
+            this.id = id;
+            this.drinkName = drinkName;
+            this.quantity = quantity;
+        }
 
-    // Method to get the age of the order in seconds
-    public int getAge() {
-        long currentTime = System.currentTimeMillis();
-        return (int) ((currentTime - this.timestamp) / 1000);
+        @JsonProperty("id")
+        public int getId() {
+            return id;
+        }
+
+        @JsonProperty("id")
+        public void setId(int id) {
+            this.id = id;
+        }
+
+        @JsonProperty("drinkName")
+        public String getDrinkName() {
+            return drinkName;
+        }
+
+        @JsonProperty("drinkName")
+        public void setDrinkName(String drinkName) {
+            this.drinkName = drinkName;
+        }
+
+        @JsonProperty("quantity")
+        public int getQuantity() {
+            return quantity;
+        }
+
+        @JsonProperty("quantity")
+        public void setQuantity(int quantity) {
+            this.quantity = quantity;
+        }
     }
 }
