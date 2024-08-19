@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -14,6 +15,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.Order;
@@ -21,6 +24,8 @@ import edu.help.dto.OrderRequest;
 import edu.help.dto.OrderResponse;
 import edu.help.dto.ResponseWrapper;
 import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 @Service
 public class OrderService {
@@ -81,15 +86,9 @@ public class OrderService {
                 );
 
                 // Serialize the order to JSON
-          
-            
-           
-
                 jedis.jsonSetWithEscape(orderKey, order);
                 System.out.println("Stored order in Redis with key: " + orderKey);
                 
-            
-
                 sendOrder(order, session);
             }
         } catch (RestClientException e) {
@@ -170,4 +169,123 @@ public class OrderService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
         return ZonedDateTime.ofInstant(Instant.now(), ZoneId.systemDefault()).format(formatter);
     }
+
+
+    public boolean deleteOrderIfExists(int barId, int userId) {
+        String key = String.format("%d.%d", barId, userId);
+        
+        System.out.println("Checking existence of key: " + key);
+        
+        // Check if the key exists
+        if (jedis.exists(key)) {
+            System.out.println("Key exists. Retrieving JSON data...");
+            
+            try {
+                // Retrieve the JSON string from Redis
+                Object JsonObject = jedis.jsonGet(key);
+                
+                System.out.println("Raw JSON String: " + JsonObject);
+                
+                if (JsonObject != null) {
+                    
+                    
+                    String jsonString = objectMapper.writeValueAsString(JsonObject);
+
+                    JsonNode jsonNode = objectMapper.readTree(jsonString);
+                    
+                    // Check if claimer is empty
+                    String claimer = jsonNode.path("claimer").asText("");
+                    
+                    System.out.println("Claimer field value: " + claimer);
+                    
+                    if (claimer.isEmpty()) {
+                        // Delete the key if claimer is empty
+                        System.out.println("Claimer is empty. Deleting key: " + key);
+                        jedis.del(key);
+                        return true; // Order was deleted
+                    } else {
+                        System.out.println("Claimer is not empty. No action taken.");
+                    }
+                } else {
+                    System.out.println("JSON String is null or empty.");
+                }
+            } catch (JsonProcessingException e) {
+                System.err.println("Error processing JSON data: " + e.getMessage());
+                e.printStackTrace();
+                // Handle exceptions (e.g., JSON parsing errors)
+            }
+        } else {
+            System.out.println("Key does not exist.");
+        }
+        
+        return false; // Order did not exist or was not deleted
+    }
+    
+    public void refreshOrdersForUser(int userId, WebSocketSession session) {
+        // Use scan to iterate over all keys
+        ScanParams scanParams = new ScanParams().match("*." + userId);
+        String cursor = "0";
+        List<Order> orders = new ArrayList<>();
+        
+        try {
+            do {
+                ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
+                cursor = scanResult.getCursor();
+                
+                for (String key : scanResult.getResult()) {
+                    // Check the type of the key
+                    String type = jedis.type(key);
+                    System.out.println("Data type of key: " + type);
+                    
+                    if ("ReJSON-RL".equals(type)) {
+                        // Use ReJSON command to retrieve the value
+                        //Object jsonObject = jedis.get(key);
+
+                        Object jsonObject = jedis.jsonGet(key);
+
+                        
+                        System.out.println("Raw JSON from Redis: " + jsonObject);
+                        
+                        if (jsonObject != null) {
+                            // Cast the Object to String
+                            //String orderJson = jsonObject.toString();
+
+                           
+                            String jsonString = objectMapper.writeValueAsString(jsonObject);
+                            
+                            System.out.println("Converted JSON String: " + jsonString);
+
+                            Order order = objectMapper.readValue(jsonString, Order.class);
+                            orders.add(order);
+                        }
+                    } else {
+                        // Log or handle keys of unsupported types
+                        System.err.println("Skipping key with unsupported type: " + key);
+                    }
+                }
+            } while (!"0".equals(cursor));
+            
+            if (orders.isEmpty()) {
+                sendOrderResponse(session, new ResponseWrapper(
+                    "info",
+                    null,
+                    "No orders found for the user."
+                ));
+            } else {
+                for (Order order : orders) {
+                    sendOrderResponse(session, new ResponseWrapper(
+                        "success",
+                        order,
+                        "Order details retrieved successfully."
+                    ));
+                }
+            }
+            
+        } catch (IOException e) {
+            e.printStackTrace();
+            sendErrorResponse(session, "Failed to retrieve orders.");
+        }
+    }
+    
+    
 }

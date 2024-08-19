@@ -13,7 +13,8 @@ public class Order {
     private String claimer;
     private String timestamp;
 
-    public Order(int barId, int userId, double price, List<DrinkOrder> drinks, String status, String claimer, String timestamp) {
+    public Order(int barId, int userId, double price, List<DrinkOrder> drinks, String status, String claimer,
+            String timestamp) {
         this.barId = barId;
         this.userId = userId;
         this.price = price;
@@ -22,6 +23,10 @@ public class Order {
         this.claimer = claimer;
         this.timestamp = timestamp;
     }
+    
+    public Order() {
+    }
+
 
     // Getters and setters
     @JsonProperty("barId")
@@ -103,6 +108,10 @@ public class Order {
             this.id = id;
             this.drinkName = drinkName;
             this.quantity = quantity;
+        }
+
+        public DrinkOrder() {
+
         }
 
         @JsonProperty("id")
