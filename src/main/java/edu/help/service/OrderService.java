@@ -1,10 +1,11 @@
 package edu.help.service;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.stereotype.Service;
@@ -15,9 +16,10 @@ import org.springframework.web.socket.WebSocketSession;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import edu.help.dto.Order;
 import edu.help.dto.OrderRequest;
 import edu.help.dto.OrderResponse;
-import edu.help.dto.OrderResponse.DrinkOrder;
+import edu.help.dto.ResponseWrapper;
 import redis.clients.jedis.JedisPooled;
 
 @Service
@@ -25,7 +27,7 @@ public class OrderService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final JedisPooled jedis; // RedisJSON and RedisTimeSeries client
+    private final JedisPooled jedis; // Redis client
 
     public OrderService(RestTemplate restTemplate, LettuceConnectionFactory redisConnectionFactory) {
         this.restTemplate = restTemplate;
@@ -39,11 +41,10 @@ public class OrderService {
         // Check if the key already exists in Redis
         String orderKey = generateOrderKey(orderRequest);
         if (jedis.exists(orderKey)) {
-            sendResponse(session, new OrderResponse(
-                "Order already in progress for barId: " + orderRequest.getBarId(),
-                0.0,
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
                 null,
-                ""
+                "Order already in progress for barId: " + orderRequest.getBarId()
             ));
             closeSession(session);
             return;
@@ -59,58 +60,77 @@ public class OrderService {
 
             if (orderResponse != null) {
                 if ("Bar is closed".equals(orderResponse.getMessage())) {
-                    sendResponse(session, new OrderResponse(
-                        "Bar is closed. Please try again later.",
-                        0.0,
+                    sendOrderResponse(session, new ResponseWrapper(
+                        "error",
                         null,
-                        ""
+                        "Bar is closed. Please try again later."
                     ));
-                    closeSession(session);  
+                    closeSession(session);
                     return;
                 }
 
-                // Prepare and store the data in Redis as JSON
-                Map<String, Object> orderData = new HashMap<>();
-                orderData.put("status", "unready");
-                orderData.put("user_id", orderRequest.getUserId());
-
-                // Formatting the drinks as a map of drinkId -> drinkName,quantity
-                Map<String, String> drinksMap = new HashMap<>();
-                for (DrinkOrder drink : orderResponse.getDrinks()) {
-                    drinksMap.put(String.valueOf(drink.getDrinkId()), drink.getDrinkName() + "," + drink.getQuantity());
-                }
-                orderData.put("drinks", drinksMap);
-                orderData.put("total_price", orderResponse.getTotalPrice());
-                orderData.put("timestamp", getCurrentTimestamp());
-
-                System.out.println("Order data to be stored in Redis: " + objectMapper.writeValueAsString(orderData));
-
-                // Store the order in Redis as JSON
-                jedis.jsonSet(orderKey, objectMapper.writeValueAsString(orderData));
-                System.out.println("Stored order in Redis with key: " + orderKey);
-
-
-                sendResponse(session, new OrderResponse(
-                    "Order processed: " + orderResponse.getMessage(),
+                // Create Order object
+                Order order = new Order(
+                    orderRequest.getBarId(),
+                    orderRequest.getUserId(),
                     orderResponse.getTotalPrice(),
-                    orderResponse.getDrinks(),
-                    "success"
-                ));
+                    convertDrinksToOrders(orderResponse.getDrinks()), // Use updated method
+                    "unready",
+                    "", // Claimer could be set based on further logic
+                    getCurrentTimestamp() // Use updated method
+                );
+
+                // Serialize the order to JSON
+          
+            
+           
+
+                jedis.jsonSetWithEscape(orderKey, order);
+                System.out.println("Stored order in Redis with key: " + orderKey);
+                
+            
+
+                sendOrder(order, session);
             }
-        } catch (RestClientException | IOException e) {
-            closeSession(session);  
+        } catch (RestClientException e) {
+            closeSession(session);
             e.printStackTrace();
-            sendErrorResponse(session, "Failed to process order: No response from PostgreSQL.");
-        }
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,
+                "Failed to process order: No response from PostgreSQL."
+            ));
+        } 
+    }
+
+    private List<Order.DrinkOrder> convertDrinksToOrders(List<OrderResponse.DrinkOrder> drinkResponses) {
+        // Convert drink orders to a list of Order.DrinkOrder objects with id, names, and quantities
+        return drinkResponses.stream()
+                             .map(drink -> new Order.DrinkOrder(drink.getDrinkId(), drink.getDrinkName(), drink.getQuantity()))
+                             .toList();
     }
 
     private String generateOrderKey(OrderRequest orderRequest) {
         return String.format("%d.%d", orderRequest.getBarId(), orderRequest.getUserId());
     }
 
-    private void sendResponse(WebSocketSession session, OrderResponse orderResponse) {
+    private void sendOrderResponse(WebSocketSession session, ResponseWrapper responseWrapper) {
         try {
-            String jsonResponse = objectMapper.writeValueAsString(orderResponse);
+            String jsonResponse = objectMapper.writeValueAsString(responseWrapper);
+            session.sendMessage(new TextMessage(jsonResponse));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendOrder(Order order, WebSocketSession session) {
+        try {
+            ResponseWrapper responseWrapper = new ResponseWrapper(
+                "success",
+                order,
+                "Order processed successfully."
+            );
+            String jsonResponse = objectMapper.writeValueAsString(responseWrapper);
             session.sendMessage(new TextMessage(jsonResponse));
         } catch (IOException e) {
             e.printStackTrace();
@@ -119,12 +139,12 @@ public class OrderService {
 
     private void sendErrorResponse(WebSocketSession session, String message) {
         try {
-            sendResponse(session, new OrderResponse(
-                message,
-                0.0,
+            ResponseWrapper responseWrapper = new ResponseWrapper(
+                "error",
                 null,
-                "error"
-            ));
+                message
+            );
+            sendOrderResponse(session, responseWrapper);
             if (session.isOpen()) {
                 session.close();
                 System.out.println("WebSocket session closed due to error.");
@@ -146,11 +166,8 @@ public class OrderService {
     }
 
     private String getCurrentTimestamp() {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        return LocalDateTime.now().format(formatter);
+        // Get current timestamp in milliseconds with date and time formatting
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+        return ZonedDateTime.ofInstant(Instant.now(), ZoneId.systemDefault()).format(formatter);
     }
-
-   
-
-    
 }
