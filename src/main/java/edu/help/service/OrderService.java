@@ -71,7 +71,6 @@ public class OrderService {
                 null,
                 "Order already in progress for barId: " + orderRequest.getBarId()
             ));
-            closeSession(session);
             return;
         }
 
@@ -133,7 +132,7 @@ public class OrderService {
     private void sendOrder(Order order, WebSocketSession session) {
         try {
             ResponseWrapper responseWrapper = new ResponseWrapper(
-                "success",
+                "create",
                 order,
                 "Order processed successfully."
             );
