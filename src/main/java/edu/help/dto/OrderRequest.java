@@ -6,6 +6,7 @@ public class OrderRequest {
 
     private int barId;
     private int userId;
+    private Boolean isHappyHour;
     private List<DrinkOrder> drinks;
 
     @Override
@@ -13,6 +14,7 @@ public String toString() {
     return "OrderRequest{" +
             "barId=" + barId +
             ", userId=" + userId +
+            ", happyHour=" + isHappyHour +
             ", drinks=" + drinks +
             '}';
 }
@@ -40,6 +42,16 @@ public String toString() {
 
     public void setDrinks(List<DrinkOrder> drinks) {
         this.drinks = drinks;
+    }
+
+    public void setIsHappyHour(boolean isHappyHour)
+    {
+        this.isHappyHour = isHappyHour;
+    }
+
+    public boolean getIsHappyHour()
+    {
+        return isHappyHour;
     }
 
     public static class DrinkOrder {
