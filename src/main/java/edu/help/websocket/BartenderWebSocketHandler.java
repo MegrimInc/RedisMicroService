@@ -1,6 +1,7 @@
 package edu.help.websocket;
 //TODO: add code for detecting and redistributing severed connections.
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
                 if (bartenderID == null || bartenderID.isEmpty() || !bartenderID.matches("[a-zA-Z]+")) {
                     // Send an error response
-                    session.sendMessage(new TextMessage("Error: Invalid bartenderID. It must be non-empty and contain only alphabetic characters."));
+                    sendErrorMessage(session, "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
                     return;
                 }
 
@@ -88,6 +89,74 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 break;
 
             case "claim":
+                int barIDClaim = (int) payload.get("barID");
+                int orderID = (int) payload.get("orderID");
+                String claimingBartenderID = (String) payload.get("bartenderID");
+
+                // Construct the Redis key for the order
+                String orderRedisKey = barIDClaim + "." + orderID;
+
+                // Retrieve the order from Redis
+                String orderJson = redisService2.get(orderRedisKey);
+
+                if (orderJson == null) {
+                    // If order doesn't exist in Redis, send a failure response
+                    sendErrorMessage(session, "Order does not exist.");
+                    break;
+                }
+
+                // Parse the order JSON to a Map
+                Map<String, Object> orderData = objectMapper.readValue(orderJson, Map.class);
+                String currentClaimer = (String) orderData.get("claimer");
+
+                if (currentClaimer != null && !currentClaimer.isEmpty()) {
+                    // If the order is already claimed, send a failure response
+                    sendErrorMessage(session, "Order already claimed by " + currentClaimer + ".");
+                    break;
+                }
+
+                // Update the order with the claiming bartender's ID
+                orderData.put("claimer", claimingBartenderID);
+
+                // Convert the updated order data back to JSON and store it in Redis
+                String updatedOrderJson = objectMapper.writeValueAsString(orderData);
+                redisService2.set(orderRedisKey, updatedOrderJson);
+
+                // Retrieve all the bartenders of the current bar to notify them
+                List<String> bartenderKeys = redisService2.getKeys(barIDClaim + ".*");
+
+// Filter keys to only include those that match the pattern barID.ALPHA_STRING
+                List<String> filteredBartenderKeys = bartenderKeys.stream()
+                        .filter(key -> key.matches(barIDClaim + "\\.[a-zA-Z]+"))
+                        .collect(Collectors.toList());
+                for (String bartenderKey : bartenderKeys) {
+                    // Skip if it's the same bartender who claimed the order
+                    if (bartenderKey.endsWith(claimingBartenderID)) {
+                        continue;
+                    }
+
+                    String bartenderSessionJson = redisService2.get(bartenderKey);
+                    Map<String, Object> bartenderData = objectMapper.readValue(bartenderSessionJson, Map.class);
+                    String bartenderSessionId = (String) bartenderData.get("sessionId");
+
+                    WebSocketSession bartenderSession = sessionMap.get(bartenderSessionId);
+                    if (bartenderSession != null && bartenderSession.isOpen()) {
+                        // Send the updated order to the other bartenders
+                        Map<String, Object> responsePayload = new HashMap<>();
+                        responsePayload.put("orders", List.of(orderData));  // Wrap the order data in a list
+
+                        String responseJson = objectMapper.writeValueAsString(responsePayload);
+                        bartenderSession.sendMessage(new TextMessage(responseJson));
+                    }
+                }
+
+                // Also send the updated order to the current bartender as part of the UI update
+                Map<String, Object> responsePayload = new HashMap<>();
+                responsePayload.put("orders", List.of(orderData));  // Wrap the order data in a list
+
+                String responseJson = objectMapper.writeValueAsString(responsePayload);
+                session.sendMessage(new TextMessage(responseJson));
+
                 break;
 
             case "unclaim":
@@ -113,7 +182,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 break;
 
             default:
-                session.sendMessage(new TextMessage("Unknown action: " + action));
+                sendErrorMessage(session, "Unknown action: " + action);
                 break;
         }
     }
@@ -135,6 +204,17 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     }
                 })
                 .collect(Collectors.toList());
+    }
+
+    private void sendErrorMessage(WebSocketSession session, String errorMessage) throws JsonProcessingException {
+        Map<String, String> errorPayload = new HashMap<>();
+        errorPayload.put("error", errorMessage);
+        String errorJson = objectMapper.writeValueAsString(errorPayload);
+        try {
+            session.sendMessage(new TextMessage(errorJson));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }
