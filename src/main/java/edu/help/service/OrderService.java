@@ -152,7 +152,7 @@ public class OrderService {
                 message
             );
             sendOrderResponse(session, responseWrapper);
-            if (session is open()) {
+            if (session.isOpen()) {
                 session.close();
                 System.out.println("WebSocket session closed due to error.");
             }
