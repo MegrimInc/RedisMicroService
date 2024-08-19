@@ -1,4 +1,5 @@
 package edu.help.websocket;
+//TODO: add code for detecting and redistributing severed connections.
 
 import java.util.HashMap;
 import java.util.List;
@@ -84,6 +85,31 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 // Convert the list of orders to JSON and send it to the client
                 String ordersJson = objectMapper.writeValueAsString(orders);
                 session.sendMessage(new TextMessage(ordersJson));
+                break;
+
+            case "claim":
+                break;
+
+            case "unclaim":
+                break;
+
+            case "ready":
+                break;
+
+
+            case "deliver":
+                break;
+
+            case "cancel":
+                break;
+
+            case "disable":
+                break;
+
+            case "open":
+                break;
+
+            case "close":
                 break;
 
             default:
