@@ -43,9 +43,10 @@ public class OrderService {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
 
         // Fetch open and happyHour status from Redis
-        String barKey = "bar:" + orderRequest.getBarId();
-        Boolean isOpen = Boolean.parseBoolean(jedis.hget(barKey, "open"));
-        Boolean isHappyHour = Boolean.parseBoolean(jedis.hget(barKey, "happyHour"));
+       // String barKey = orderRequest.getBarId();
+        String barKey = String.valueOf(orderRequest.getBarId());
+        Boolean isOpen = Boolean.valueOf(jedis.hget(barKey, "open"));
+        Boolean isHappyHour = Boolean.valueOf(jedis.hget(barKey, "happyHour"));
 
         // Check if the bar is open
         if (isOpen == null || !isOpen) {
