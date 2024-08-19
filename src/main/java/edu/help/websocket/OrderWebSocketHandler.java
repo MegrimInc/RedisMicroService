@@ -88,18 +88,6 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    // @SuppressWarnings("unchecked")
-    // private Map<String, Object> parsePayload(String payload) {
-    //     try {
-    //         // Parse payload as a Map to extract action and OrderRequest
-    //         return objectMapper.readValue(payload, Map.class);
-    //     } catch (IOException e) {
-    //         e.printStackTrace();
-    //         return null;
-    //     }
-    // }
-
-
     @SuppressWarnings("unchecked")
     private Map<String, Object> parsePayload(String payload) {
         System.out.println("Received payload: " + payload);  // Log the raw payload
