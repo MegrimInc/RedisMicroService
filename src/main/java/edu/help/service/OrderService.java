@@ -42,39 +42,47 @@ public class OrderService {
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
 
-        // Fetch open and happyHour status from Redis
-       // String barKey = orderRequest.getBarId();
-        String barKey = String.valueOf(orderRequest.getBarId());
-        Boolean isOpen = Boolean.valueOf(jedis.hget(barKey, "open"));
-        Boolean isHappyHour = Boolean.valueOf(jedis.hget(barKey, "happyHour"));
 
-        // Check if the bar is open
-        if (isOpen == null || !isOpen) {
-            System.err.println("Bar is closed, order cannot be processed for barId: " + orderRequest.getBarId());
-            sendErrorResponse(session, "Failed to process order: The bar is currently closed.");
-            return;
-        }
-
-        // Set the happy hour status in the OrderRequest
-        if (isHappyHour != null) {
-            orderRequest.setIsHappyHour(isHappyHour);
-        } else {
-            System.err.println("Happy Hour status not found in Redis for barId: " + orderRequest.getBarId());
-            sendErrorResponse(session, "Failed to retrieve happy hour status.");
-            return;
-        }
-
+         // Fetch open and happyHour status from Redis
+         String barKey = String.valueOf(orderRequest.getBarId());
+         Boolean isOpen = Boolean.valueOf(jedis.hget(barKey, "open"));
+         Boolean isHappyHour = Boolean.valueOf(jedis.hget(barKey, "happyHour"));
+ 
+         // Check if the bar is open
+         if (isOpen == null || !isOpen) {
+             sendOrderResponse(session, new ResponseWrapper(
+                 "error",
+                 null,  // No data, as the bar is closed
+                 "Failed to process order: The bar is currently closed."
+             ));
+             return;
+         }
+       
+    
         // Check if the key already exists in Redis (for duplicate order prevention)
         String orderKey = generateOrderKey(orderRequest);
         if (jedis.exists(orderKey)) {
             sendOrderResponse(session, new ResponseWrapper(
                 "error",
-                null,
+                null,  // No data, as the order is already in progress
                 "Order already in progress for barId: " + orderRequest.getBarId()
             ));
             return;
         }
-
+     
+    
+        // Set the happy hour status in the OrderRequest
+        if (isHappyHour != null) {
+            orderRequest.setIsHappyHour(isHappyHour);
+        } else {
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,  // No data, as happy hour status is missing
+                "Failed to retrieve happy hour status."
+            ));
+            return;
+        }
+    
         try {
             // Send order request to PostgreSQL (already containing the happy hour status)
             OrderResponse orderResponse = restTemplate.postForObject(
@@ -82,7 +90,7 @@ public class OrderService {
                 orderRequest,
                 OrderResponse.class
             );
-
+    
             if (orderResponse != null) {
                 // Create Order object and store it in Redis
                 Order order = new Order(
@@ -94,18 +102,21 @@ public class OrderService {
                     "",
                     getCurrentTimestamp()
                 );
-
+    
                 jedis.jsonSetWithEscape(orderKey, order);
                 System.out.println("Stored order in Redis with key: " + orderKey);
-
-                sendOrder(order, session);
-            }
+    
+                sendOrderResponse(session, new ResponseWrapper(
+                    "create",
+                    order,  // Send the actual order data
+                    "Order successfully processed."
+                ));
+            } 
         } catch (RestClientException e) {
-            closeSession(session);
             e.printStackTrace();
             sendOrderResponse(session, new ResponseWrapper(
                 "error",
-                null,
+                null,  // No data, as an exception occurred
                 "Failed to process order: No response from PostgreSQL."
             ));
         }
@@ -130,19 +141,6 @@ public class OrderService {
         }
     }
 
-    private void sendOrder(Order order, WebSocketSession session) {
-        try {
-            ResponseWrapper responseWrapper = new ResponseWrapper(
-                "create",
-                order,
-                "Order processed successfully."
-            );
-            String jsonResponse = objectMapper.writeValueAsString(responseWrapper);
-            session.sendMessage(new TextMessage(jsonResponse));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
     private void sendErrorResponse(WebSocketSession session, String message) {
         try {
@@ -161,16 +159,6 @@ public class OrderService {
         }
     }
 
-    private void closeSession(WebSocketSession session) {
-        try {
-            if (session.isOpen()) {
-                session.close();
-                System.out.println("WebSocket session closed.");
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
     private String getCurrentTimestamp() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
@@ -261,7 +249,7 @@ public class OrderService {
             } else {
                 for (Order order : orders) {
                     sendOrderResponse(session, new ResponseWrapper(
-                        "success",
+                        "refresh",
                         order,
                         "Order details retrieved successfully."
                     ));
