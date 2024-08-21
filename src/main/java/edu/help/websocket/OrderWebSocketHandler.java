@@ -25,6 +25,23 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         this.orderService = orderService;
     }
 
+    // Method to handle a successful connection
+    @Override
+public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+    // Log the connection establishment
+    System.out.println("WebSocket connection established with session ID: " + session.getId());
+    
+    // Create a ResponseWrapper object with the desired message and messageType
+    ResponseWrapper response = new ResponseWrapper(
+        "ping",                          // messageType
+        null,                             // data
+        "Successfully connected to server" // message
+    );
+    
+    // Send the response to the client
+    sendOrderResponse(session, response);
+}
+
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         try {
@@ -87,18 +104,6 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             session.sendMessage(new TextMessage("Error: " + e.getMessage()));
         }
     }
-
-    // @SuppressWarnings("unchecked")
-    // private Map<String, Object> parsePayload(String payload) {
-    //     try {
-    //         // Parse payload as a Map to extract action and OrderRequest
-    //         return objectMapper.readValue(payload, Map.class);
-    //     } catch (IOException e) {
-    //         e.printStackTrace();
-    //         return null;
-    //     }
-    // }
-
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> parsePayload(String payload) {
