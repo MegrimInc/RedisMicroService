@@ -192,7 +192,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 closePayload.put("barStatus", true);
 
                 // Broadcast the bar close status to all bartenders
-                broadcastToBar(barID4, closePayload, null);
+                broadcastToBar(barID4, closePayload);
 
                 // No need to send a separate response to the bartender who initiated the close action
                 break;
@@ -206,7 +206,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 closePayload0.put("barStatus", false);
 
                 // Broadcast the bar close status to all bartenders
-                broadcastToBar(barID0, closePayload0, null);
+                broadcastToBar(barID0, closePayload0);
 
                 // No need to send a separate response to the bartender who initiated the close action
                 break;
@@ -328,7 +328,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             }
 
             // Broadcast the updated order to all bartenders
-            broadcastToBar(barID, orderData, cancelingBartenderID);
+            broadcastToBar(barID, orderData);
         }
     }
 
@@ -389,7 +389,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             }
 
             // Broadcast the updated order to all bartenders
-            broadcastToBar(barID, orderData, bartenderID);
+            broadcastToBar(barID, orderData);
 
             //Saarthak's code goes here
         }
@@ -452,7 +452,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             }
 
             // Broadcast the updated order to all bartenders
-            broadcastToBar(barID, orderData, claimingBartenderID);
+            broadcastToBar(barID, orderData);
         }
     }
 
@@ -513,7 +513,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             }
 
             // Broadcast the updated order to all bartenders
-            broadcastToBar(barID, orderData, readyBartenderID);
+            broadcastToBar(barID, orderData);
         }
     }
 
@@ -567,7 +567,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             }
 
             // Broadcast the updated order to all bartenders
-            broadcastToBar(barID, orderData, unclaimingBartenderID);
+            broadcastToBar(barID, orderData);
         }
     }
 
@@ -604,7 +604,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void broadcastToBar(int barID, Map<String, Object> data, String excludeSessionID) throws IOException {
+    private void broadcastToBar(int barID, Map<String, Object> data) throws IOException {
         // Prepare the data to be broadcasted
         String message = objectMapper.writeValueAsString(data);
 
@@ -613,7 +613,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String sessionID = entry.getKey();
             WebSocketSession wsSession = entry.getValue();
 
-            if (wsSession.isOpen() && (excludeSessionID == null || !excludeSessionID.equals(sessionID))) {
+            if (wsSession.isOpen() ) {
                 wsSession.sendMessage(new TextMessage(message));
             }
         }
