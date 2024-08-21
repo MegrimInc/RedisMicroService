@@ -6,8 +6,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import edu.help.dto.Order;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.json.JSONObject;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -27,10 +29,10 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     private final JedisPool jedisPool;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>(); // Session storage
-    private final RestTemplate restTemplate;
 
-    public BartenderWebSocketHandler(UpdateService redisService2) {
-        this.redisService2 = redisService2;
+    public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool) {
+        this.jedisPooled = jedisPooled;
+        this.jedisPool = jedisPool;
     }
 
     @Override
@@ -126,15 +128,9 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             case "deliver":
                 handleDeliverAction(session, payload);
                 break;
-                int barID3 = (int) payload.get("barID");
-                int orderID3 = (int) payload.get("orderID");
-                finalizeOrder("deliver", barID3, orderID3);
 
             case "cancel":
                 handleCancelAction(session, payload);
-                int barID4 = (int) payload.get("barID");
-                int orderID4 = (int) payload.get("orderID");
-                finalizeOrder("cancel", barID4, orderID4);
                 break;
 
             case "disable":
@@ -581,49 +577,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
     }
 
-
-    private void finalizeOrder(String action, int barID, int orderID)
-    {
-        String orderRedisKey = barID + "." + orderID;
-        String orderJson = redisService2.get(orderRedisKey);
-
-        if (orderJson == null) {
-            System.err.println("Order does not exist in Redis, cannot " + action);
-            return;
-        }
-
-        try {
-            Order order = objectMapper.readValue(orderJson, Order.class);
-
-            // Create a payload to send to PostgreSQL, including the action
-            Map<String, Object> requestPayload = new HashMap<>();
-            requestPayload.put("order", order);
-            requestPayload.put("action", action);
-
-            // Send the order and action to PostgreSQL-based service using RestTemplate
-            try {
-                OrderResponse orderResponse = restTemplate.postForObject(
-                    "http://34.230.32.169:8080/processFinalizedOrder",
-                    requestPayload,
-                    OrderResponse.class
-                );
-
-                if (orderResponse != null && "Order processed successfully".equals(orderResponse.getMessage())) {
-                    // Remove the order from Redis
-                    redisService2.delete(orderRedisKey);
-                    System.out.println("Order marked as " + action + " and stored in PostgreSQL.");
-                } else {
-                    System.err.println("Failed to process the order in PostgreSQL: " + (orderResponse != null ? orderResponse.getMessage() : "No response"));
-                }
-            } catch (Exception e) {
-                System.err.println("Error sending order to PostgreSQL: " + e.getMessage());
-                e.printStackTrace();
-            }
-
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-        }
-    }
     private List<Order> getOrdersFromDataSource(int barID) {
         try (Jedis jedis = jedisPool.getResource()) {
             ScanParams scanParams = new ScanParams().match(barID + ".*");

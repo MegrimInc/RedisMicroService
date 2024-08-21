@@ -84,6 +84,7 @@ public class OrderService {
         }
     
         try {
+            // Send order request to PostgreSQL (already containing the happy hour status)
             OrderResponse orderResponse = restTemplate.postForObject(
                 "http://34.230.32.169:8080/" + orderRequest.getBarId() + "/processOrder",
                 orderRequest,
@@ -91,6 +92,7 @@ public class OrderService {
             );
     
             if (orderResponse != null) {
+                // Create Order object and store it in Redis
                 Order order = new Order(
                     orderRequest.getBarId(),
                     orderRequest.getUserId(),
