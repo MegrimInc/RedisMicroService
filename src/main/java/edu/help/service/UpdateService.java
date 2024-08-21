@@ -55,6 +55,16 @@ public class UpdateService {
         return keys;
     }
 
+    public void delete(String key) {
+        if (redisTemplate.hasKey(key)) {
+            redisTemplate.delete(key);
+            System.out.println("Deleted key from Redis: " + key);
+        } else {
+            System.out.println("Key does not exist in Redis: " + key);
+        }
+    }
+
+    
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
         System.out.println("Order Request sent to PostgreSQL: " + orderRequest);
@@ -74,7 +84,8 @@ public class UpdateService {
             }
             return;
         }
-
+        
+        
         // Try to process the order with PostgreSQL
         try {
             OrderResponse orderResponse = restTemplate.postForObject(
