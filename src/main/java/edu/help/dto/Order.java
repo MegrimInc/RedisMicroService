@@ -12,9 +12,10 @@ public class Order {
     private String status;
     private String claimer;
     private String timestamp;
+    private String sessionId;
 
     public Order(int barId, int userId, double price, List<DrinkOrder> drinks, String status, String claimer,
-            String timestamp) {
+            String timestamp, String sessionId) {
         this.barId = barId;
         this.userId = userId;
         this.price = price;
@@ -22,6 +23,7 @@ public class Order {
         this.status = status;
         this.claimer = claimer;
         this.timestamp = timestamp;
+        this.sessionId = sessionId;
     }
     
     public Order() {
@@ -97,6 +99,16 @@ public class Order {
     @JsonProperty("timestamp")
     public void setTimestamp(String timestamp) {
         this.timestamp = timestamp;
+    }
+
+    @JsonProperty("sessionId")
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    @JsonProperty("sessionId")
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
     }
 
     public static class DrinkOrder {

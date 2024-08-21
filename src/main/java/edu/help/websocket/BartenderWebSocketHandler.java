@@ -1,18 +1,23 @@
 package edu.help.websocket;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.Order;
 import redis.clients.jedis.Jedis;
@@ -51,7 +56,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
                 if (bartenderID == null || bartenderID.isEmpty() || !bartenderID.matches("[a-zA-Z]+")) {
                     // Send an error response
-                    sendErrorMessage(session, "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
+                    sendErrorMessage(session,
+                            "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
                     return;
                 }
 
@@ -65,7 +71,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     String existingSessionJson = (String) jedisPooled.jsonGet(redisKey);
                     if (existingSessionJson != null) {
                         // Parse the existing session data
-                        Map<String, Object> existingSessionData = objectMapper.readValue(existingSessionJson, Map.class);
+                        Map<String, Object> existingSessionData = objectMapper.readValue(existingSessionJson,
+                                Map.class);
                         String existingSessionId = (String) existingSessionData.get("sessionId");
                         WebSocketSession existingSession = sessionMap.get(existingSessionId);
 
@@ -97,11 +104,10 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     session.sendMessage(new TextMessage("Initialization successful for bartender " + bartenderID));
 
                     // Placeholder to notify each bartender of active WebSocket connections
-                    notifyBartendersOfActiveConnections( barID );
+                    notifyBartendersOfActiveConnections(barID);
 
                 }
                 break;
-
 
             case "refresh":
                 int barID2 = (int) payload.get("barID");
@@ -139,7 +145,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
                 if (bartenderID00 == null || bartenderID00.isEmpty() || !bartenderID00.matches("[a-zA-Z]+")) {
                     // Send an error response
-                    sendErrorMessage(session, "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
+                    sendErrorMessage(session,
+                            "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
                     return;
                 }
 
@@ -153,7 +160,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     String existingSessionJson = (String) jedisPooled.jsonGet(redisKey00);
                     if (existingSessionJson != null) {
                         // Parse the existing session data
-                        Map<String, Object> existingSessionData = objectMapper.readValue(existingSessionJson, Map.class);
+                        Map<String, Object> existingSessionData = objectMapper.readValue(existingSessionJson,
+                                Map.class);
 
                         // Set isAcceptingOrders to FALSE
                         existingSessionData.put("isAcceptingOrders", false);
@@ -164,7 +172,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                         List<Object> results = transaction.exec(); // Execute the transaction
 
                         if (results == null || results.isEmpty()) {
-                            sendErrorMessage(session, "Failed to disable the bartender due to a conflict. Please try again.");
+                            sendErrorMessage(session,
+                                    "Failed to disable the bartender due to a conflict. Please try again.");
                             return;
                         }
 
@@ -181,7 +190,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     sendErrorMessage(session, "An error occurred while disabling the bartender. Please try again.");
                 }
                 break;
-
 
             case "open":
                 // ADD CHECK HERE TO BAR, INCLUDE RACE CONDITIONS.
@@ -228,10 +236,11 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             List<Map<String, Object>> acceptingBartenders = new ArrayList<>();
             for (String key : bartenderKeys) {
                 String[] parts = key.split("\\.");
-                if (parts.length != 2) continue;
+                if (parts.length != 2)
+                    continue;
 
                 String bartenderID = parts[1];
-                if (bartenderID.matches("[a-zA-Z]+")) {  // Ensure bartenderID is alphabetic
+                if (bartenderID.matches("[a-zA-Z]+")) { // Ensure bartenderID is alphabetic
                     String bartenderJson = (String) jedisPooled.jsonGet(key);
                     if (bartenderJson != null) {
                         Map<String, Object> bartenderData = objectMapper.readValue(bartenderJson, Map.class);
@@ -270,7 +279,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             e.printStackTrace();
         }
     }
-
 
     @Transactional
     private void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
@@ -329,6 +337,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
+            updateUser(orderData);
         }
     }
 
@@ -390,6 +399,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
+
+            updateUser(orderData);
 
             //Saarthak's code goes here
         }
@@ -453,6 +464,9 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
+
+            updateUser(orderData);
+
         }
     }
 
@@ -487,7 +501,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String currentClaimer = (String) orderData.get("claimer");
 
             if (!readyBartenderID.equals(currentClaimer)) {
-                sendErrorMessage(session, "You cannot mark this order as ready because it was claimed by another bartender.");
+                sendErrorMessage(session,
+                        "You cannot mark this order as ready because it was claimed by another bartender.");
                 jedis.unwatch(); // Unwatch if the order was claimed by another bartender
                 return;
             }
@@ -514,9 +529,10 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
+
+            updateUser(orderData);
         }
     }
-
 
     @Transactional
     private void handleUnclaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
@@ -568,6 +584,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
+            updateUser(orderData);
         }
     }
 
@@ -613,11 +630,37 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String sessionID = entry.getKey();
             WebSocketSession wsSession = entry.getValue();
 
-            if (wsSession.isOpen() ) {
+            if (wsSession.isOpen()) {
                 wsSession.sendMessage(new TextMessage(message));
             }
         }
     }
 
+    private void updateUser(Map<String, Object> orderData) throws IOException {
+        // Extract relevant information from the order data
+        int barId = (int) orderData.get("barId");
+        String status = (String) orderData.get("status");
+        String claimer = (String) orderData.get("claimer");
+        String sessionId = (String) orderData.get("sessionId");
 
+        // Prepare the data to be sent to the user
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("barId", barId);
+        updateData.put("status", status);
+        updateData.put("claimer", claimer);
+
+        // Convert the map to a JSON string using ObjectMapper
+        String message = objectMapper.writeValueAsString(updateData);
+
+        // Find the session by ID
+        WebSocketSession userSession = sessionMap.get(sessionId);
+
+        // If the session is found and open, send the message
+        if (userSession != null && userSession.isOpen()) {
+            userSession.sendMessage(new TextMessage(message));
+        } else {
+            System.err.println("User session not found or closed: " + sessionId);
+        }
+
+    }
 }

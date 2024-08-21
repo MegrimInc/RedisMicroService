@@ -7,6 +7,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -100,7 +102,8 @@ public class OrderService {
                     convertDrinksToOrders(orderResponse.getDrinks()),
                     "unready",
                     "",
-                    getCurrentTimestamp()
+                    getCurrentTimestamp(),
+                    session.getId() 
                 );
     
                 jedis.jsonSetWithEscape(orderKey, order);
@@ -227,11 +230,21 @@ public class OrderService {
                         System.out.println("Raw JSON from Redis: " + jsonObject);
                         
                         if (jsonObject != null) {
-                            String jsonString = objectMapper.writeValueAsString(jsonObject);
+                            Map<String, Object> orderMap = objectMapper.convertValue(jsonObject, new TypeReference<Map<String, Object>>() {});
                             
-                            System.out.println("Converted JSON String: " + jsonString);
+                            orderMap.put("sessionId", session.getId());
+                                        
+                           // Convert the modified Map back to a JSON string
+                        String updatedJsonString = objectMapper.writeValueAsString(orderMap);
 
-                            Order order = objectMapper.readValue(jsonString, Order.class);
+                        // Store the updated JSON string back in Redis under the same key
+                        jedis.jsonSet(key, updatedJsonString);
+                            
+                        System.out.println("Updated sessionId in Redis for key: " + key);
+                           
+                        // Convert the updated JSON string to an Order object
+                        Order order = objectMapper.readValue(updatedJsonString, Order.class);
+                        // Add the order to the list of orders to be returned
                             orders.add(order);
                         }
                     } else {
