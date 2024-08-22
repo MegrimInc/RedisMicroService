@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -214,37 +215,39 @@ public class OrderService {
         ScanParams scanParams = new ScanParams().match("*." + userId);
         String cursor = "0";
         List<Order> orders = new ArrayList<>();
-        
+
         try {
             do {
                 ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
                 cursor = scanResult.getCursor();
-                
+
                 for (String key : scanResult.getResult()) {
                     String type = jedis.type(key);
                     System.out.println("Data type of key: " + type);
-                    
+
                     if ("ReJSON-RL".equals(type)) {
                         Object jsonObject = jedis.jsonGet(key);
-                        
-                        System.out.println("Raw JSON from Redis: " + jsonObject);
-                        
-                        if (jsonObject != null) {
-                            Map<String, Object> orderMap = objectMapper.convertValue(jsonObject, new TypeReference<Map<String, Object>>() {});
-                            
-                            orderMap.put("sessionId", session.getId());
-                                        
-                           // Convert the modified Map back to a JSON string
-                        String updatedJsonString = objectMapper.writeValueAsString(orderMap);
 
-                        // Store the updated JSON string back in Redis under the same key
-                        jedis.jsonSet(key, updatedJsonString);
-                            
-                        System.out.println("Updated sessionId in Redis for key: " + key);
-                           
-                        // Convert the updated JSON string to an Order object
-                        Order order = objectMapper.readValue(updatedJsonString, Order.class);
-                        // Add the order to the list of orders to be returned
+                        System.out.println("Raw JSON from Redis: " + jsonObject);
+
+                        if (jsonObject != null) {
+                            Map<String, Object> orderMap = objectMapper.convertValue(jsonObject,
+                                    new TypeReference<Map<String, Object>>() {
+                                    });
+
+                            orderMap.put("sessionId", session.getId());
+
+                            // Convert the modified Map back to a JSON string
+                            String updatedJsonString = objectMapper.writeValueAsString(orderMap);
+
+                            // Store the updated JSON string back in Redis under the same key
+                            jedis.jsonSet(key, updatedJsonString);
+
+                            System.out.println("Updated sessionId in Redis for key: " + key);
+
+                            // Convert the updated JSON string to an Order object
+                            Order order = objectMapper.readValue(updatedJsonString, Order.class);
+                            // Add the order to the list of orders to be returned
                             orders.add(order);
                         }
                     } else {
@@ -252,26 +255,26 @@ public class OrderService {
                     }
                 }
             } while (!"0".equals(cursor));
-            
+
             if (orders.isEmpty()) {
                 sendOrderResponse(session, new ResponseWrapper(
-                    "info",
-                    null,
-                    "No orders found for the user."
-                ));
+                        "info",
+                        null,
+                        "No orders found for the user."));
             } else {
                 for (Order order : orders) {
                     sendOrderResponse(session, new ResponseWrapper(
-                        "refresh",
-                        order,
-                        "Order details retrieved successfully."
-                    ));
+                            "refresh",
+                            order,
+                            "Order details retrieved successfully."));
                 }
             }
-            
+
         } catch (IOException e) {
             e.printStackTrace();
             sendErrorResponse(session, "Failed to retrieve orders.");
         }
     }
+    
+   
 }

@@ -1,7 +1,9 @@
 package edu.help.websocket;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
@@ -20,6 +22,7 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
 
     private final OrderService orderService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
 
     public OrderWebSocketHandler(OrderService orderService) {
         this.orderService = orderService;
@@ -30,6 +33,8 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
 public void afterConnectionEstablished(WebSocketSession session) throws Exception {
     // Log the connection establishment
     System.out.println("WebSocket connection established with session ID: " + session.getId());
+
+    sessionMap.put(session.getId(), session);
     
     // Create a ResponseWrapper object with the desired message and messageType
     ResponseWrapper response = new ResponseWrapper(
@@ -135,6 +140,33 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
             session.sendMessage(new TextMessage(jsonResponse));
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void updateUser(Map<String, Object> orderData) throws IOException {
+        // Extract relevant information from the order data
+        int barId = (int) orderData.get("barId");
+        String status = (String) orderData.get("status");
+        String claimer = (String) orderData.get("claimer");
+        String sessionId = (String) orderData.get("sessionId");
+
+        // Prepare the data to be sent to the user
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put("barId", barId);
+        updateData.put("status", status);
+        updateData.put("claimer", claimer);
+
+        // Convert the map to a JSON string using ObjectMapper
+        String message = objectMapper.writeValueAsString(updateData);
+
+        // Retrieve the session from the sessionMap using the sessionId
+        WebSocketSession userSession = sessionMap.get(sessionId);
+
+        // If the session is found and open, send the message
+        if (userSession != null && userSession.isOpen()) {
+            userSession.sendMessage(new TextMessage(message));
+        } else {
+            System.err.println("User session not found or closed: " + sessionId);
         }
     }
 }

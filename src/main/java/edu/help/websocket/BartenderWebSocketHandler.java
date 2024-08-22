@@ -34,10 +34,12 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     private final JedisPool jedisPool;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>(); // Session storage
+    private final OrderWebSocketHandler orderWebSocketHandler;
 
-    public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool) {
+    public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool, OrderWebSocketHandler orderWebSocketHandler) {
         this.jedisPooled = jedisPooled;
         this.jedisPool = jedisPool;
+        this.orderWebSocketHandler = orderWebSocketHandler;
     }
 
 
@@ -338,7 +340,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
-            updateUser(orderData);
+            orderWebSocketHandler.updateUser(orderData);
         }
     }
 
@@ -401,7 +403,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
 
-            updateUser(orderData);
+            orderWebSocketHandler.updateUser(orderData);
 
             //Saarthak's code goes here
         }
@@ -466,7 +468,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
 
-            updateUser(orderData);
+            orderWebSocketHandler.updateUser(orderData);
 
         }
     }
@@ -531,7 +533,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
 
-            updateUser(orderData);
+            orderWebSocketHandler.updateUser(orderData);
         }
     }
 
@@ -585,7 +587,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Broadcast the updated order to all bartenders
             broadcastToBar(barID, orderData);
-            updateUser(orderData);
+            orderWebSocketHandler.updateUser(orderData);
         }
     }
 
@@ -637,31 +639,5 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void updateUser(Map<String, Object> orderData) throws IOException {
-        // Extract relevant information from the order data
-        int barId = (int) orderData.get("barId");
-        String status = (String) orderData.get("status");
-        String claimer = (String) orderData.get("claimer");
-        String sessionId = (String) orderData.get("sessionId");
-
-        // Prepare the data to be sent to the user
-        Map<String, Object> updateData = new HashMap<>();
-        updateData.put("barId", barId);
-        updateData.put("status", status);
-        updateData.put("claimer", claimer);
-
-        // Convert the map to a JSON string using ObjectMapper
-        String message = objectMapper.writeValueAsString(updateData);
-
-        // Find the session by ID
-        WebSocketSession userSession = sessionMap.get(sessionId);
-
-        // If the session is found and open, send the message
-        if (userSession != null && userSession.isOpen()) {
-            userSession.sendMessage(new TextMessage(message));
-        } else {
-            System.err.println("User session not found or closed: " + sessionId);
-        }
-
-    }
+    
 }
