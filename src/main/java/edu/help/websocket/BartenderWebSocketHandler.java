@@ -40,6 +40,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         this.jedisPool = jedisPool;
     }
 
+
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         // Log the received message payload
@@ -95,10 +96,10 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     jedisPooled.jsonSet(redisKey, objectMapper.writeValueAsString(redisValue));
                     List<Object> results = transaction.exec(); // Execute the transaction
 
-                    if (results == null || results.isEmpty()) {
+                    /*if (results == null || results.isEmpty()) {
                         sendErrorMessage(session, "Failed to initialize session due to a conflict. Please try again.");
                         return;
-                    }
+                    }*/
 
                     sessionMap.put(session.getId(), session); // Store the session in the session map
                     session.sendMessage(new TextMessage("Initialization successful for bartender " + bartenderID));
