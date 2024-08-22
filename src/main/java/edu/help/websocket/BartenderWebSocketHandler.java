@@ -54,13 +54,14 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         String action = (String) payload.get("action");
         switch (action) {
             case "initialize":
+                System.out.println("new code added!");
                 int barID = (int) payload.get("barID");
                 String bartenderID = (String) payload.get("bartenderID");
 
                 if (bartenderID == null || bartenderID.isEmpty() || !bartenderID.matches("[a-zA-Z]+")) {
                     // Send an error response
                     sendErrorMessage(session,
-                            "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
+                            "Initialization Failed: Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
                     return;
                 }
 
@@ -115,12 +116,26 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             case "refresh":
                 int barID2 = (int) payload.get("barID");
 
-                List<Order> orders = getOrdersFromDataSource(barID2);
+                try {
+                    // Retrieve JSON data from Redis
+                    List<String> ordersJson = getOrdersFromDataSource(barID2);
 
-                // Convert the list of orders to JSON and send it to the client
-                String ordersJson = objectMapper.writeValueAsString(orders);
-                session.sendMessage(new TextMessage(ordersJson));
+                    // Convert the list of JSON strings to a JSON array string
+                    String ordersJsonArray = "[" + String.join(",", ordersJson) + "]";
+
+                    // Create a JSON object with the "orders" key
+                    String responseJson = "{\"orders\":" + ordersJsonArray + "}";
+
+                    // Send the JSON object to the client
+                    session.sendMessage(new TextMessage(responseJson));
+
+                    // TODO: CHECK IF BAR IS ACTIVE
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    sendErrorMessage(session, "Error retrieving orders");
+                }
                 break;
+
 
             case "claim":
                 handleClaimAction(session, payload);
@@ -597,29 +612,32 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
     }
 
-    private List<Order> getOrdersFromDataSource(int barID) {
+    private List<String> getOrdersFromDataSource(int barID) {
         try (Jedis jedis = jedisPool.getResource()) {
+            // Prepare to scan Redis for keys matching the pattern
             ScanParams scanParams = new ScanParams().match(barID + ".*");
             String cursor = "0";
-            List<Order> orders = new ArrayList<>();
+            List<String> ordersJson = new ArrayList<>();
 
             do {
+                // Scan for keys with the given pattern
                 ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
                 cursor = scanResult.getCursor();
                 List<String> keys = scanResult.getResult();
 
+                // Process each key
                 for (String key : keys) {
-                    String orderJson = (String) jedisPooled.jsonGet(key);
+                    // Get the JSON string associated with the key
+                    String orderJson = jedis.get(key);
                     if (orderJson != null) {
-                        Order order = objectMapper.readValue(orderJson, Order.class);
-                        orders.add(order);
+                        ordersJson.add(orderJson);
                     }
                 }
-            } while (!"0".equals(cursor));
+            } while (!"0".equals(cursor)); // Continue scanning until cursor is "0"
 
-            return orders;
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
+            return ordersJson;
+        } catch (Exception e) {
+            e.printStackTrace(); // Handle Redis exceptions
             return Collections.emptyList();
         }
     }
