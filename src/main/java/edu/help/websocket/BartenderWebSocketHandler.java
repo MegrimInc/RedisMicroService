@@ -761,6 +761,22 @@ private void handleRefreshAction(WebSocketSession session, Map<String, Object> p
         } else {
             session.sendMessage(new TextMessage("{\"orders\":[]}"));
         }
+
+        String barKey = String.valueOf(barID);
+        Object barData = jedisPooled.jsonGet(barKey);
+
+        if (barData != null) {
+            // Assuming barData is a JSON object with multiple fields, including "barStatus"
+            Map<String, Object> barDataMap = objectMapper.convertValue(barData, Map.class);
+            Boolean barStatus = (Boolean) barDataMap.get("open");
+
+            // Send the barStatus back to the client
+            String barStatusJson = "{\"barStatus\":" + barStatus + "}";
+            session.sendMessage(new TextMessage(barStatusJson));
+        } else {
+            System.out.println("Bar key not found: " + barKey);
+            session.sendMessage(new TextMessage("{\"barStatus\":false}"));  // Defaulting to false if key doesn't exist
+        }
     } catch (Exception e) {
         e.printStackTrace(); // Handle exceptions
         sendErrorMessage(session, "Error retrieving orders");
