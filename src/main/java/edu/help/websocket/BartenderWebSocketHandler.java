@@ -147,7 +147,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     String bartenderJson = (String) jedisPooled.jsonGet(key);
                     if (bartenderJson != null) {
                         Map<String, Object> bartenderData = objectMapper.readValue(bartenderJson, Map.class);
-                        Boolean isAcceptingOrders = (Boolean) bartenderData.get("isAcceptingOrders");
+                        Boolean isAcceptingOrders = (Boolean) bartenderData.get("active");
 
                         if (isAcceptingOrders != null && isAcceptingOrders) {
                             acceptingBartenders.add(bartenderData);
@@ -215,8 +215,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 // Send a terminate message before closing the existing session
                 if (existingSession != null && existingSession.isOpen()) {
                     JSONObject terminateMessage = new JSONObject();
-                    terminateMessage.put("key", "terminate");
-                    terminateMessage.put("value", bartenderID);
+                    terminateMessage.put("terminate", "true");
                     existingSession.sendMessage(new TextMessage(terminateMessage.toString()));
                     existingSession.close();
                 }
@@ -675,7 +674,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             }
 
             // Set isAcceptingOrders to FALSE
-            existingSessionData.put("isAcceptingOrders", false);
+            existingSessionData.put("active", false);
 
             // Start a transaction and update the Redis entry
             Transaction transaction = jedis.multi();
