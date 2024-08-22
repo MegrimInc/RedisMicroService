@@ -18,6 +18,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import edu.help.dto.BartenderSession;
 import edu.help.dto.Order;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -62,6 +63,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     break;
 
                 case "refresh":
+                    handleRefreshAction(session, payloadMap);
                     handleRefreshAction(session, payloadMap);
                     break;
 
@@ -129,67 +131,88 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
 
     private void notifyBartendersOfActiveConnections(int barID) {
-        String pattern = barID + ".*";
-
+        System.out.println("notifyBartendersOfActiveConnections triggered with barID: " + barID);
+    
+        String pattern = barID + ".[a-zA-Z]*";
+        System.out.println("Searching for keys with pattern: " + pattern);
+    
         try (Jedis jedis = jedisPool.getResource()) {
             // Find all bartender keys for the given barID
             Set<String> bartenderKeys = jedis.keys(pattern);
-
-            // Filter bartenders with isAcceptingOrders == true and where bartenderID is alphabetic
-            List<Map<String, Object>> acceptingBartenders = new ArrayList<>();
+            System.out.println("Found bartender keys: " + bartenderKeys);
+    
+            // Filter bartenders with getActive() == true and where bartenderID is alphabetic
+            List<BartenderSession> acceptingBartenders = new ArrayList<>();
             for (String key : bartenderKeys) {
+                System.out.println("Processing key: " + key);
                 String[] parts = key.split("\\.");
-                if (parts.length != 2)
+                if (parts.length != 2) {
+                    System.out.println("Invalid key format: " + key);
                     continue;
-
+                }
+    
                 String bartenderID = parts[1];
+                System.out.println("Found bartenderID: " + bartenderID);
                 if (bartenderID.matches("[a-zA-Z]+")) { // Ensure bartenderID is alphabetic
-                    String bartenderJson = (String) jedisPooled.jsonGet(key);
-                    if (bartenderJson != null) {
-                        Map<String, Object> bartenderData = objectMapper.readValue(bartenderJson, Map.class);
-                        Boolean isAcceptingOrders = (Boolean) bartenderData.get("active");
-
-                        if (isAcceptingOrders != null && isAcceptingOrders) {
-                            acceptingBartenders.add(bartenderData);
-                        }
+                    BartenderSession bartenderSession = null;
+                    try {
+                        // Deserialize the stored JSON into a BartenderSession object
+                        bartenderSession = jedisPooled.jsonGet(key, BartenderSession.class);
+                        System.out.println("Deserialized BartenderSession: " + bartenderSession);
+                    } catch (Exception e) {
+                        System.out.println("Failed to deserialize key: " + key);
+                        e.printStackTrace();
+                        continue; // Skip if deserialization fails
+                    }
+    
+                    if (bartenderSession != null && bartenderSession.getActive()) { // Changed from isActive() to getActive()
+                        System.out.println("Bartender is active: " + bartenderID);
+                        acceptingBartenders.add(bartenderSession);
                     }
                 }
             }
-
+    
+            System.out.println("Total bartenders active: " + acceptingBartenders.size());
+    
             // Send a message to each bartender
             for (int i = 0; i < acceptingBartenders.size(); i++) {
-                Map<String, Object> bartenderData = acceptingBartenders.get(i);
-                String bartenderID = (String) bartenderData.get("bartenderID");
-                String sessionId = (String) bartenderData.get("sessionId");
-                WebSocketSession bartenderSession = sessionMap.get(sessionId);
-
-                if (bartenderSession != null && bartenderSession.isOpen()) {
+                BartenderSession bartenderSession = acceptingBartenders.get(i);
+                String sessionId = bartenderSession.getSessionId();
+                WebSocketSession wsSession = sessionMap.get(sessionId);
+    
+                if (wsSession != null && wsSession.isOpen()) {
+                    System.out.println("Sending update to bartender: " + bartenderSession.getBartenderId());
+    
                     // Create the message using Map<String, String>
                     Map<String, String> updateMessage = new HashMap<>();
-                    updateMessage.put("updateTerminal", bartenderID);
+                    updateMessage.put("updateTerminal", bartenderSession.getBartenderId());
                     updateMessage.put("bartenderCount", String.valueOf(acceptingBartenders.size()));
                     updateMessage.put("bartenderNumber", String.valueOf(i));
-
+    
                     // Convert the map to a JSON string using ObjectMapper
                     String jsonMessage = objectMapper.writeValueAsString(updateMessage);
-
+    
                     // Send the message to the WebSocket session
-                    bartenderSession.sendMessage(new TextMessage(jsonMessage));
+                    wsSession.sendMessage(new TextMessage(jsonMessage));
+                } else {
+                    System.out.println("WebSocket session is closed or null for bartender: " + bartenderSession.getBartenderId());
                 }
             }
         } catch (Exception e) {
             // Handle exceptions, such as JSON processing or WebSocket issues
+            System.out.println("Exception in notifyBartendersOfActiveConnections: ");
             e.printStackTrace();
         }
     }
 
-
     @Transactional
     private void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-        System.out.println("new code added!");
 
         int barID = (int) payload.get("barID");
         String bartenderID = (String) payload.get("bartenderID");
+
+        System.out.println("Received bartenderID: " + bartenderID);
+        System.out.println("Received barID: " + barID);
 
         if (bartenderID == null || bartenderID.isEmpty() || !bartenderID.matches("[a-zA-Z]+")) {
             // Send an error response
@@ -205,44 +228,54 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             jedis.watch(redisKey); // Watch the key for changes
 
             // Check if there's an existing session for this bartender and close it
-            String existingSessionJson = (String) jedisPooled.jsonGet(redisKey);
-            if (existingSessionJson != null) {
-                // Parse the existing session data
-                Map<String, Object> existingSessionData = objectMapper.readValue(existingSessionJson, Map.class);
-                String existingSessionId = (String) existingSessionData.get("sessionId");
-                WebSocketSession existingSession = sessionMap.get(existingSessionId);
+            BartenderSession existingSession = null;
+            try {
+                // Assuming the key holds JSON data, use jsonGet
+                existingSession = jedisPooled.jsonGet(redisKey, BartenderSession.class);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if (existingSession != null) {
+                String existingSessionId = existingSession.getSessionId();
+                WebSocketSession existingWsSession = sessionMap.get(existingSessionId);
 
                 // Send a terminate message before closing the existing session
-                if (existingSession != null && existingSession.isOpen()) {
+                if (existingWsSession != null && existingWsSession.isOpen()) {
                     JSONObject terminateMessage = new JSONObject();
-                    terminateMessage.put("terminate", "true");
-                    existingSession.sendMessage(new TextMessage(terminateMessage.toString()));
-                    existingSession.close();
+                    terminateMessage.put("terminate", true);
+                    existingWsSession.sendMessage(new TextMessage(terminateMessage.toString()));
+                    existingWsSession.close();
+                    System.out.println("Closing the connection for..." + bartenderID);
                 }
             }
 
             // Store the new session in Redis and in the session map
-            Map<String, Object> redisValue = new HashMap<>();
-            redisValue.put("sessionId", session.getId()); // Store session ID or other relevant info
-            redisValue.put("active", true); // Boolean value
+            BartenderSession newSession = new BartenderSession(barID, bartenderID, session.getId(), true);
 
             Transaction transaction = jedis.multi(); // Start the transaction
-            jedisPooled.jsonSet(redisKey, objectMapper.writeValueAsString(redisValue));
+            System.out.println("Attempting to execute Redis transaction...");
+
+            // Use jsonSet for storing JSON objects
+            transaction.jsonSet(redisKey, objectMapper.writeValueAsString(newSession));
+
+            System.out.println("BartenderSession stored in Redis: " + redisKey);
             List<Object> results = transaction.exec(); // Execute the transaction
+            System.out.println("Transaction results: " + results);
+
+            if (results == null || results.isEmpty()) {
+                sendErrorMessage(session, "Initialization failed due to a conflict. Please try again.");
+                return;
+            }
 
             sessionMap.put(session.getId(), session); // Store the session in the session map
+            System.out.println("BartenderSession stored in Redis: " + session);
             session.sendMessage(new TextMessage("Initialization successful for bartender " + bartenderID));
 
             // Notify each bartender of active WebSocket connections
             notifyBartendersOfActiveConnections(barID);
         }
     }
-
-
-
-
-
-
 
     @Transactional
     private void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
