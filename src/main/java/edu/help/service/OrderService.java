@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import edu.help.websocket.BartenderWebSocketHandler;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
@@ -42,7 +43,7 @@ public class OrderService {
         this.jedis = new JedisPooled(redisConnectionFactory.getHostName(), redisConnectionFactory.getPort());
     }
 
-    public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
+    public void processOrder(OrderRequest orderRequest, WebSocketSession session, BartenderWebSocketHandler bars) {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
 
 
@@ -106,6 +107,7 @@ public class OrderService {
                     getCurrentTimestamp(),
                     session.getId() 
                 );
+
     
                 jedis.jsonSetWithEscape(orderKey, order);
                 System.out.println("Stored order in Redis with key: " + orderKey);
@@ -115,6 +117,14 @@ public class OrderService {
                     order,  // Send the actual order data
                     "Order successfully processed."
                 ));
+//NEW CODE FOR BROADCASTING TO BARS: UNTESTED
+                Map<String, Object> data = new HashMap<>();
+                data.put("orders", order);
+
+
+// Send the JSON message
+                bars.broadcastToBar(orderRequest.getBarId(), data);
+
             } 
         } catch (RestClientException e) {
             e.printStackTrace();
@@ -123,6 +133,10 @@ public class OrderService {
                 null,  // No data, as an exception occurred
                 "Failed to process order: No response from PostgreSQL."
             ));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -23,9 +24,14 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     private final OrderService orderService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
+    private final BartenderWebSocketHandler bartenderWebSocketHandler;
 
-    public OrderWebSocketHandler(OrderService orderService) {
+
+
+    @Autowired
+    public OrderWebSocketHandler(OrderService orderService, BartenderWebSocketHandler bartenderWebSocketHandler) {
         this.orderService = orderService;
+        this.bartenderWebSocketHandler = bartenderWebSocketHandler;
     }
 
     // Method to handle a successful connection
@@ -70,10 +76,11 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
             switch (action.toLowerCase()) {
                 case "create":
                     if (orderRequest != null) {
-                        orderService.processOrder(orderRequest, session);
+                        orderService.processOrder(orderRequest, session, bartenderWebSocketHandler);
                     } else {
                         sendErrorResponse(session, "Invalid order format.");
                     }
+
                     break;
                     case "delete":
                     int barId = (int) payloadMap.get("barId");
