@@ -37,13 +37,15 @@ public class OrderService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final JedisPooled jedis; // Redis client
+    //private final BartenderWebSocketHandler bartenderWebSocketHandler;
 
     public OrderService(RestTemplate restTemplate, LettuceConnectionFactory redisConnectionFactory) {
         this.restTemplate = restTemplate;
         this.jedis = new JedisPooled(redisConnectionFactory.getHostName(), redisConnectionFactory.getPort());
+        //this.bartenderWebSocketHandler = bartenderWebSocketHandler;
     }
 
-    public void processOrder(OrderRequest orderRequest, WebSocketSession session, BartenderWebSocketHandler bars) {
+    public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
 
 
@@ -117,13 +119,13 @@ public class OrderService {
                     order,  // Send the actual order data
                     "Order successfully processed."
                 ));
-//NEW CODE FOR BROADCASTING TO BARS: UNTESTED
+                //NEW CODE FOR BROADCASTING TO BARS: UNTESTED
                 Map<String, Object> data = new HashMap<>();
                 data.put("orders", order);
 
 
-// Send the JSON message
-                bars.broadcastToBar(orderRequest.getBarId(), data);
+                // Send the JSON message
+                //bartenderWebSocketHandler.broadcastToBar(orderRequest.getBarId(), data);
 
             } 
         } catch (RestClientException e) {
@@ -133,11 +135,11 @@ public class OrderService {
                 null,  // No data, as an exception occurred
                 "Failed to process order: No response from PostgreSQL."
             ));
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+         } //catch (JsonProcessingException e) {
+        //     throw new RuntimeException(e);
+        // } catch (IOException e) {
+        //     throw new RuntimeException(e);
+        // }
     }
 
     private List<Order.DrinkOrder> convertDrinksToOrders(List<OrderResponse.DrinkOrder> drinkResponses) {

@@ -64,7 +64,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
                 case "refresh":
                     handleRefreshAction(session, payloadMap);
-                    handleRefreshAction(session, payloadMap);
                     break;
 
                 case "claim":
