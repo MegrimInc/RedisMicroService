@@ -79,6 +79,81 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     handleInitializeAction(session, payloadMap);
                     break;
 
+                case "happyHour":
+                    int barID3 = (int) payloadMap.get("barID");
+                    String barKey3 = String.valueOf(barID3);  // Adjust this to match your specific key format
+
+                    try (Jedis jedis = jedisPool.getResource()) {
+                        jedis.watch(barKey3);
+
+                        // Check if happy hour is already active
+                        boolean isHappyHourActive = Boolean.parseBoolean(jedis.hget(barKey3, "happyHour"));
+                        if (isHappyHourActive) {
+                            sendErrorMessage(session, "Happy Hour is already active.");
+                            jedis.unwatch();
+                            break;
+                        }
+
+                        Transaction transaction = jedis.multi();
+                        transaction.hset(barKey3, "happyHour", "true");
+                        // Include any other fields that need to be set during happy hour activation
+                        List<Object> results = transaction.exec();
+
+                        if (results != null) {
+                            // Notify all bartenders if the transaction was successful
+                            Map<String, Object> happyHourPayload = new HashMap<>();
+                            happyHourPayload.put("key", "happyHour");
+                            happyHourPayload.put("happyHour", true);
+
+                            // Use the existing broadcastToBar method to notify all bartenders
+                            broadcastToBar(barID3, happyHourPayload);
+                        } else {
+                            sendErrorMessage(session, "Failed to start Happy Hour due to a race condition.");
+                        }
+
+                    } catch (Exception e) {
+                        sendErrorMessage(session, "An error occurred while starting Happy Hour.");
+                    }
+                    break;
+
+                case "sadHour":
+                    int barID4 = (int) payloadMap.get("barID");
+                    String barKey4 = String.valueOf(barID4);  // Adjust this to match your specific key format
+
+                    try (Jedis jedis = jedisPool.getResource()) {
+                        jedis.watch(barKey4);
+
+                        // Check if happy hour is already inactive
+                        boolean isHappyHourInactive = !Boolean.parseBoolean(jedis.hget(barKey4, "happyHour"));
+                        if (isHappyHourInactive) {
+                            sendErrorMessage(session, "Happy Hour is already inactive.");
+                            jedis.unwatch();
+                            break;
+                        }
+
+                        Transaction transaction = jedis.multi();
+                        transaction.hset(barKey4, "happyHour", "false");
+                        // Include any other fields that need to be set during sad hour activation
+                        List<Object> results = transaction.exec();
+
+                        if (results != null) {
+                            // Notify all bartenders if the transaction was successful
+                            Map<String, Object> sadHourPayload = new HashMap<>();
+                            sadHourPayload.put("key", "happyHour");
+                            sadHourPayload.put("happyHour", false);
+
+                            // Use the existing broadcastToBar method to notify all bartenders
+                            broadcastToBar(barID4, sadHourPayload);
+                        } else {
+                            sendErrorMessage(session, "Failed to end Happy Hour due to a race condition.");
+                        }
+
+                    } catch (Exception e) {
+                        sendErrorMessage(session, "An error occurred while ending Happy Hour.");
+                    }
+                    break;
+
+
                 case "refresh":
                     handleRefreshAction(session, payloadMap);
                     break;
@@ -108,32 +183,82 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     break;
 
                 case "open":
-                    // ADD CHECK HERE TO BAR, INCLUDE RACE CONDITIONS.
-                    int barID4 = (int) payloadMap.get("barID");
+                    int barID = (int) payloadMap.get("barID");
+                    String barKey = String.valueOf(barID);  // Adjust this to match your specific key format
 
-                    // Prepare the data to be broadcasted to all bartenders
-                    Map<String, Object> openPayload = new HashMap<>();
-                    openPayload.put("barStatus", true);
+                    try (Jedis jedis = jedisPool.getResource()) {
+                        jedis.watch(barKey);
 
-                    // Broadcast the bar open status to all bartenders
-                    broadcastToBar(barID4, openPayload);
+                        // Check if the bar is already open
+                        boolean isBarOpen = Boolean.parseBoolean(jedis.hget(barKey, "open"));
+                        if (isBarOpen) {
+                            sendErrorMessage(session, "Bar is already open.");
+                            jedis.unwatch();
+                            break;
+                        }
 
-                    // No need to send a separate response to the bartender who initiated the open action
+                        Transaction transaction = jedis.multi();
+                        transaction.hset(barKey, "open", "true");
+                        // Include any other fields that need to be set during opening
+                        List<Object> results = transaction.exec();
+
+                        if (results != null) {
+                            // Notify all bartenders if the transaction was successful
+                            Map<String, Object> openPayload = new HashMap<>();
+                            openPayload.put("key", "barStatus");
+                            openPayload.put("barStatus", true);
+
+                            // Convert the map to a JSON string (if needed)
+
+                            // Use the existing broadcastToBar method to notify all bartenders
+                            broadcastToBar(barID, openPayload);
+                        } else {
+                            sendErrorMessage(session, "Failed to open the bar due to a race condition.");
+                        }
+
+                    } catch (Exception e) {
+                        sendErrorMessage(session, "An error occurred while opening the bar.");
+                    }
                     break;
 
                 case "close":
-                    // ADD CHECK HERE TO BAR, INCLUDE RACE CONDITIONS
-                    int barID0 = (int) payloadMap.get("barID");
+                    int barID2 = (int) payloadMap.get("barID");
+                    String barKey2 = String.valueOf(barID2);  // Adjust this to match your specific key format
 
-                    // Prepare the data to be broadcasted to all bartenders
-                    Map<String, Object> closePayload0 = new HashMap<>();
-                    closePayload0.put("barStatus", false);
+                    try (Jedis jedis = jedisPool.getResource()) {
+                        jedis.watch(barKey2);
 
-                    // Broadcast the bar close status to all bartenders
-                    broadcastToBar(barID0, closePayload0);
+                        // Check if the bar is already closed
+                        boolean isBarClosed = !Boolean.parseBoolean(jedis.hget(barKey2, "open"));
+                        if (isBarClosed) {
+                            sendErrorMessage(session, "Bar is already closed.");
+                            jedis.unwatch();
+                            break;
+                        }
 
-                    // No need to send a separate response to the bartender who initiated the close action
+                        Transaction transaction = jedis.multi();
+                        transaction.hset(barKey2, "open", "false");
+                        // Include any other fields that need to be set during closing
+                        List<Object> results = transaction.exec();
+
+                        if (results != null) {
+                            // Notify all bartenders if the transaction was successful
+                            Map<String, Object> closePayload = new HashMap<>();
+                            closePayload.put("key", "barStatus");
+                            closePayload.put("barStatus", false);
+
+                            // Use the existing broadcastToBar method to notify all bartenders
+                            broadcastToBar(barID2, closePayload);
+                        } else {
+                            sendErrorMessage(session, "Failed to close the bar due to a race condition.");
+                        }
+
+                    } catch (Exception e) {
+                        sendErrorMessage(session, "An error occurred while closing the bar.");
+                    }
                     break;
+
+
 
                 default:
                     sendErrorMessage(session, "Unknown action: " + action);
@@ -144,6 +269,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             sendErrorMessage(session, "An error occurred while processing the message.");
         }
     }
+
+
 
     private void notifyBartendersOfActiveConnections(int barID) {
         System.out.println("notifyBartendersOfActiveConnections triggered with barID: " + barID);
@@ -221,6 +348,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+
+
     @Transactional
     private void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
 
@@ -291,6 +420,39 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             // Notify each bartender of active WebSocket connections
             notifyBartendersOfActiveConnections(barID);
             handleRefreshAction(session, payload);
+
+            // Send openstatus
+            String barStatusKey = Integer.toString(barID); // Assuming barID is used as the key for bar status
+            String barStatusJson = jedis.get(barStatusKey);
+
+            if (barStatusJson != null) {
+                boolean isBarOpen = Boolean.parseBoolean(jedis.hget(barStatusKey, "open"));
+
+                JSONObject barStatusMessage = new JSONObject();
+                barStatusMessage.put("barStatus", isBarOpen);
+
+                session.sendMessage(new TextMessage(barStatusMessage.toString()));
+                System.out.println("Sent bar status to session: " + session.getId());
+            } else {
+                // Send an error or default status if bar status is not found
+                sendErrorMessage(session, "Failed to retrieve bar status.");
+            }
+
+            String happyHourStatus = jedis.hget(barStatusKey, "happyHour");
+
+            if (happyHourStatus != null) {
+                boolean isHappyHour = Boolean.parseBoolean(happyHourStatus);
+
+                JSONObject happyHourMessage = new JSONObject();
+                happyHourMessage.put("happyHour", isHappyHour);
+
+                session.sendMessage(new TextMessage(happyHourMessage.toString()));
+                System.out.println("Sent happy hour status to session: " + session.getId());
+            } else {
+                // Send an error or default status if happy hour status is not found
+                sendErrorMessage(session, "Failed to retrieve happy hour status.");
+            }
+
         }
     }
 
