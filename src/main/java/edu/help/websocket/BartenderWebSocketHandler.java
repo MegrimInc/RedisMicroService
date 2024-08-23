@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -22,7 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.BartenderSession;
 import edu.help.dto.Order;
-import edu.help.dto.OrderResponse;
 import edu.help.service.RedisOrderService;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -729,85 +727,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
     }
 
-    // @Transactional
-    // private void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-    //     int barID = (int) payload.get("barID");
-
-    //     try (Jedis jedis = jedisPool.getResource()) {
-    //         // Prepare to scan Redis for keys matching the pattern
-    //         ScanParams scanParams = new ScanParams().match(barID + ".*");
-    //         String cursor = "0";
-
-    //         List<Order> orders = new ArrayList<>();
-
-    //         System.out.println("Scanning Redis with pattern: " + barID + ".*");
-    //         System.out.println("Initial cursor value: " + cursor);
-
-    //         do {
-    //             // Scan for keys with the given pattern
-    //             ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
-    //             cursor = scanResult.getCursor();
-    //             List<String> keys = scanResult.getResult();
-
-    //             // Print out the keys being scanned
-    //             System.out.println("Keys scanned in this iteration:");
-    //             for (String key : keys) {
-    //                 System.out.println(" - " + key);
-    //             }
-
-    //             // Process each key
-    //             for (String key : keys) {
-    //                 // Check the data type of the key
-    //                 String type = jedis.type(key);
-    //                 System.out.println("Data type of key: " + type);
-
-    //                 if ("ReJSON-RL".equals(type)) { // Ensure we're dealing with the expected JSON type
-    //                     Object jsonObject = jedisPooled.jsonGet(key);
-    //                     System.out.println("Raw JSON from Redis: " + jsonObject);
-
-    //                     if (jsonObject != null && !jsonObject.toString().contains("active")) { // Filter out session-related data
-    //                         // Convert JSON to Order object
-    //                         Order order = objectMapper.convertValue(jsonObject, Order.class);
-    //                         orders.add(order);
-    //                     } else {
-    //                         System.out.println("Skipping session-related data for key: " + key);
-    //                     }
-    //                 } else {
-    //                     System.err.println("Skipping key with unsupported type: " + key);
-    //                 }
-    //             }
-    //         } while (!"0".equals(cursor)); // Continue scanning until cursor is "0"
-
-    //         // Convert the list of Order objects to JSON and send it to the client
-    //         if (!orders.isEmpty()) {
-    //             String ordersJsonArray = objectMapper.writeValueAsString(orders);
-    //             String responseJson = "{\"orders\":" + ordersJsonArray + "}";
-    //             session.sendMessage(new TextMessage(responseJson));
-    //         } else {
-    //             session.sendMessage(new TextMessage("{\"orders\":[]}"));
-    //         }
-
-    //         String barKey = String.valueOf(barID);
-    //         Object barData = jedisPooled.jsonGet(barKey);
-
-    //         if (barData != null) {
-    //             // Assuming barData is a JSON object with multiple fields, including "barStatus"
-    //             Map<String, Object> barDataMap = objectMapper.convertValue(barData, Map.class);
-    //             Boolean barStatus = (Boolean) barDataMap.get("open");
-
-    //             // Send the barStatus back to the client
-    //             String barStatusJson = "{\"barStatus\":" + barStatus + "}";
-    //             session.sendMessage(new TextMessage(barStatusJson));
-    //         } else {
-    //             System.out.println("Bar key not found: " + barKey);
-    //             session.sendMessage(new TextMessage("{\"barStatus\":false}"));  // Defaulting to false if key doesn't exist
-    //         }
-    //     } catch (Exception e) {
-    //         e.printStackTrace(); // Handle exceptions
-    //         sendErrorMessage(session, "Error retrieving orders");
-    //     }
-    // }
-
+    
 
     @Transactional
     private void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
