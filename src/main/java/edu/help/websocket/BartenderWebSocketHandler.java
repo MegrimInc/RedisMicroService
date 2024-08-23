@@ -874,17 +874,24 @@ private void handleRefreshAction(WebSocketSession session, Map<String, Object> p
             }
         } while (!"0".equals(cursor)); // Continue scanning until cursor is "0"
 
-        // Convert the list of Order objects to a Map and send it to the client
-        if (!orders.isEmpty()) {
-            List<Map<String, Object>> ordersData = new ArrayList<>();
-            for (Order order : orders) {
-                Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-                ordersData.add(orderData);
-            }
-            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(ordersData)));
-        } else {
-            session.sendMessage(new TextMessage("{\"orders\":[]}"));
+       // Convert the list of Order objects to a Map and send it to the client
+       if (!orders.isEmpty()) {
+        List<Map<String, Object>> ordersData = new ArrayList<>();
+        for (Order order : orders) {
+            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
+            ordersData.add(orderData);
+            // Debug: Log each order being sent
+            System.out.println("Converted Order to Map: " + orderData);
         }
+
+        String ordersJsonArray = objectMapper.writeValueAsString(ordersData);
+        System.out.println("Final JSON Array being sent: " + ordersJsonArray); // Debug: Log the final JSON string
+        session.sendMessage(new TextMessage(ordersJsonArray));
+    } else {
+        System.out.println("No orders found, sending empty list."); // Debug: Log if no orders found
+        session.sendMessage(new TextMessage("{\"orders\":[]}"));
+    }
+
 
         //String barKey = String.valueOf(barID);
        // Object barDataObj = jedisPooled.jsonGet(barKey);
