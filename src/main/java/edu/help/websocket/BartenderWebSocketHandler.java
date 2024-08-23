@@ -817,103 +817,92 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
 
     @Transactional
-private void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-    int barID = (int) payload.get("barID");
+    private void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+        int barID = (int) payload.get("barID");
 
-    try (Jedis jedis = jedisPool.getResource()) {
-        // Prepare to scan Redis for keys matching the pattern
-        ScanParams scanParams = new ScanParams().match(barID + ".*");
-        String cursor = "0";
+        try (Jedis jedis = jedisPool.getResource()) {
+            // Prepare to scan Redis for keys matching the pattern
+            ScanParams scanParams = new ScanParams().match(barID + ".*");
+            String cursor = "0";
 
-        List<Order> orders = new ArrayList<>();
+            List<Order> orders = new ArrayList<>();
 
-        System.out.println("Scanning Redis with pattern: " + barID + ".*");
-        System.out.println("Initial cursor value: " + cursor);
+            System.out.println("Scanning Redis with pattern: " + barID + ".*");
+            System.out.println("Initial cursor value: " + cursor);
 
-        do {
-            // Scan for keys with the given pattern
-            ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
-            cursor = scanResult.getCursor();
-            List<String> keys = scanResult.getResult();
+            do {
+                // Scan for keys with the given pattern
+                ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
+                cursor = scanResult.getCursor();
+                List<String> keys = scanResult.getResult();
 
-            // Print out the keys being scanned
-            System.out.println("Keys scanned in this iteration:");
-            for (String key : keys) {
-                System.out.println(" - " + key);
-            }
-
-            // Process each key, but only if it matches the format barId.# (where # is a number)
-            for (String key : keys) {
-                // Match the format barId.# and ensure the part after the dot is entirely numeric
-                if (key.matches(barID + "\\.\\d+")) {  // This regex matches barID.# where # is one or more digits
-                    try {
-                        // Retrieve the JSON object from Redis
-                        Object orderJsonObj = jedisPooled.jsonGet(key);
-
-                        if (orderJsonObj == null) {
-                            System.out.println("Order does not exist for key: " + key);
-                            continue;
-                        }
-
-                        // Convert the retrieved Object directly to an Order object
-                        Order order = objectMapper.convertValue(orderJsonObj, Order.class);
-
-                        // Exclude session-related data
-                        if (!orderJsonObj.toString().contains("active")) {
-                            orders.add(order);
-                        } else {
-                            System.out.println("Skipping session-related data for key: " + key);
-                        }
-                    } catch (JedisDataException e) {
-                        System.err.println("Encountered JedisDataException for key: " + key + " - " + e.getMessage());
-                        // Optionally handle recovery or cleanup here
-                    }
-                } else {
-                    System.out.println("Skipping key that does not match format: " + key);
+                // Print out the keys being scanned
+                System.out.println("Keys scanned in this iteration:");
+                for (String key : keys) {
+                    System.out.println(" - " + key);
                 }
+
+                // Process each key, but only if it matches the format barId.# (where # is a number)
+                for (String key : keys) {
+                    // Match the format barId.# and ensure the part after the dot is entirely numeric
+                    if (key.matches(barID + "\\.\\d+")) {  // This regex matches barID.# where # is one or more digits
+                        try {
+                            // Retrieve the JSON object from Redis
+                            Object orderJsonObj = jedisPooled.jsonGet(key);
+
+                            if (orderJsonObj == null) {
+                                System.out.println("Order does not exist for key: " + key);
+                                continue;
+                            }
+
+                            // Convert the retrieved Object directly to an Order object
+                            Order order = objectMapper.convertValue(orderJsonObj, Order.class);
+
+                            // Exclude session-related data
+                            if (!orderJsonObj.toString().contains("active")) {
+                                orders.add(order);
+                            } else {
+                                System.out.println("Skipping session-related data for key: " + key);
+                            }
+                        } catch (JedisDataException e) {
+                            System.err.println("Encountered JedisDataException for key: " + key + " - " + e.getMessage());
+                            // Optionally handle recovery or cleanup here
+                        }
+                    } else {
+                        System.out.println("Skipping key that does not match format: " + key);
+                    }
+                }
+            } while (!"0".equals(cursor)); // Continue scanning until cursor is "0"
+
+            // Convert the list of Order objects to a Map and send it to the client
+            if (!orders.isEmpty()) {
+                List<Map<String, Object>> ordersData = new ArrayList<>();
+                for (Order order : orders) {
+                    Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
+                    ordersData.add(orderData);
+                    // Debug: Log each order being sent
+                    System.out.println("Converted Order to Map: " + orderData);
+                }
+
+                // Create a map with the key "orders" and value as the list of order maps
+                Map<String, Object> responseMap = new HashMap<>();
+                responseMap.put("orders", ordersData);
+
+                // Convert the map to a JSON string
+                String ordersJsonArray = objectMapper.writeValueAsString(responseMap);
+                System.out.println("Final JSON being sent: " + ordersJsonArray); // Debug: Log the final JSON string
+                session.sendMessage(new TextMessage(ordersJsonArray));
+            } else {
+                System.out.println("No orders found, sending empty list."); // Debug: Log if no orders found
+                session.sendMessage(new TextMessage("{\"orders\":[]}"));
             }
-        } while (!"0".equals(cursor)); // Continue scanning until cursor is "0"
 
-       // Convert the list of Order objects to a Map and send it to the client
-       if (!orders.isEmpty()) {
-        List<Map<String, Object>> ordersData = new ArrayList<>();
-        for (Order order : orders) {
-            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-            ordersData.add(orderData);
-            // Debug: Log each order being sent
-            System.out.println("Converted Order to Map: " + orderData);
+        } catch (Exception e) {
+            e.printStackTrace(); // Handle exceptions
+            sendErrorMessage(session, "Error retrieving orders");
         }
-
-        String ordersJsonArray = objectMapper.writeValueAsString(ordersData);
-        System.out.println("Final JSON Array being sent: " + ordersJsonArray); // Debug: Log the final JSON string
-        session.sendMessage(new TextMessage(ordersJsonArray));
-    } else {
-        System.out.println("No orders found, sending empty list."); // Debug: Log if no orders found
-        session.sendMessage(new TextMessage("{\"orders\":[]}"));
     }
 
-
-        //String barKey = String.valueOf(barID);
-       // Object barDataObj = jedisPooled.jsonGet(barKey);
-
-        // if (barDataObj != null) {
-        //     // Assuming barData is a JSON object with multiple fields, including "barStatus"
-        //     Map<String, Object> barDataMap = objectMapper.convertValue(barDataObj, Map.class);
-        //     Boolean barStatus = (Boolean) barDataMap.get("open");
-
-        //     // Send the barStatus back to the client
-        //     Map<String, Object> response = new HashMap<>();
-        //     response.put("barStatus", barStatus);
-        //     session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
-        // } else {
-        //     System.out.println("Bar key not found: " + barKey);
-        //     session.sendMessage(new TextMessage("{\"barStatus\":false}"));  // Defaulting to false if key doesn't exist
-        // }
-    } catch (Exception e) {
-        e.printStackTrace(); // Handle exceptions
-        sendErrorMessage(session, "Error retrieving orders");
-    }
-}
 
 
     public void broadcastToBar(int barID, Map<String, Object> data) throws IOException {
