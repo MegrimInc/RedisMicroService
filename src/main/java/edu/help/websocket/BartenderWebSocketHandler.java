@@ -393,13 +393,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
-            // Check if the order is ready for cancellation
-            String currentStatus = order.getStatus();
-            if (!"ready".equals(currentStatus)) {
-                sendErrorMessage(session, "Only orders that are ready can be canceled.");
-                jedis.unwatch(); // Unwatch if the order is not ready
-                return;
-            }
 
             // Check if the canceling bartender is the one who claimed the order
             String currentClaimer = order.getClaimer();
