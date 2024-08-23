@@ -421,37 +421,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             notifyBartendersOfActiveConnections(barID);
             handleRefreshAction(session, payload);
 
-            // Send openstatus
-            String barStatusKey = Integer.toString(barID); // Assuming barID is used as the key for bar status
-            String barStatusJson = jedis.get(barStatusKey);
-
-            if (barStatusJson != null) {
-                boolean isBarOpen = Boolean.parseBoolean(jedis.hget(barStatusKey, "open"));
-
-                JSONObject barStatusMessage = new JSONObject();
-                barStatusMessage.put("barStatus", isBarOpen);
-
-                session.sendMessage(new TextMessage(barStatusMessage.toString()));
-                System.out.println("Sent bar status to session: " + session.getId());
-            } else {
-                // Send an error or default status if bar status is not found
-                sendErrorMessage(session, "Failed to retrieve bar status.");
-            }
-
-            String happyHourStatus = jedis.hget(barStatusKey, "happyHour");
-
-            if (happyHourStatus != null) {
-                boolean isHappyHour = Boolean.parseBoolean(happyHourStatus);
-
-                JSONObject happyHourMessage = new JSONObject();
-                happyHourMessage.put("happyHour", isHappyHour);
-
-                session.sendMessage(new TextMessage(happyHourMessage.toString()));
-                System.out.println("Sent happy hour status to session: " + session.getId());
-            } else {
-                // Send an error or default status if happy hour status is not found
-                sendErrorMessage(session, "Failed to retrieve happy hour status.");
-            }
 
         }
     }
