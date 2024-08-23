@@ -102,7 +102,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                         if (results != null) {
                             // Notify all bartenders if the transaction was successful
                             Map<String, Object> happyHourPayload = new HashMap<>();
-                            happyHourPayload.put("key", "happyHour");
                             happyHourPayload.put("happyHour", true);
 
                             // Use the existing broadcastToBar method to notify all bartenders
@@ -139,7 +138,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                         if (results != null) {
                             // Notify all bartenders if the transaction was successful
                             Map<String, Object> sadHourPayload = new HashMap<>();
-                            sadHourPayload.put("key", "happyHour");
                             sadHourPayload.put("happyHour", false);
 
                             // Use the existing broadcastToBar method to notify all bartenders
@@ -205,7 +203,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                         if (results != null) {
                             // Notify all bartenders if the transaction was successful
                             Map<String, Object> openPayload = new HashMap<>();
-                            openPayload.put("key", "barStatus");
                             openPayload.put("barStatus", true);
 
                             // Convert the map to a JSON string (if needed)
@@ -244,7 +241,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                         if (results != null) {
                             // Notify all bartenders if the transaction was successful
                             Map<String, Object> closePayload = new HashMap<>();
-                            closePayload.put("key", "barStatus");
                             closePayload.put("barStatus", false);
 
                             // Use the existing broadcastToBar method to notify all bartenders
@@ -944,7 +940,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
             String barStatus = jedis.hget(String.valueOf(barID), "open");
 
             if (barStatus != null) {
-                String barStatus1 = barStatus;
+                boolean barStatus1 = barStatus.equals("true");
 
                 JSONObject happyHourMessage = new JSONObject();
                 happyHourMessage.put("barStatus", barStatus1);
@@ -959,7 +955,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
             String happyHourStatus = jedis.hget(String.valueOf(barID), "happyHour");
 
             if (happyHourStatus != null) {
-                String isHappyHour = happyHourStatus;
+                boolean isHappyHour = happyHourStatus.equals("true");
 
                 JSONObject happyHourMessage = new JSONObject();
                 happyHourMessage.put("happyHour", isHappyHour);
