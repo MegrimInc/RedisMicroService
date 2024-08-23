@@ -290,6 +290,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Notify each bartender of active WebSocket connections
             notifyBartendersOfActiveConnections(barID);
+            handleRefreshAction(session, payload);
         }
     }
 
