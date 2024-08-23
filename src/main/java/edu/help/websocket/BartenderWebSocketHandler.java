@@ -987,7 +987,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
                 sendErrorMessage(session, "Failed to retrieve happy hour status.");
             }
 
-        }
+
 
         } catch (Exception e) {
             e.printStackTrace(); // Handle exceptions
