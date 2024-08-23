@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.help.dto.BartenderSession;
 import edu.help.dto.Order;
 import edu.help.dto.OrderResponse;
+import edu.help.service.RedisOrderService;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
@@ -41,14 +42,16 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>(); // Session storage
     private final OrderWebSocketHandler orderWebSocketHandler;
     private final RestTemplate restTemplate;
+    private final RedisOrderService redisOrderService;
 
     public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool,
-            OrderWebSocketHandler orderWebSocketHandler, RestTemplate restTemplate) {
+            OrderWebSocketHandler orderWebSocketHandler, RestTemplate restTemplate, RedisOrderService redisOrderService) {
         this.jedisPooled = jedisPooled;
         this.jedisPool = jedisPool;
         this.orderWebSocketHandler = orderWebSocketHandler;
         instance = this;
         this.restTemplate = restTemplate;
+        this.redisOrderService = redisOrderService;
 
     }
 
@@ -346,17 +349,7 @@ private void handleDeliverAction(WebSocketSession session, Map<String, Object> p
         }
 
         // Send the order to PostgreSQL
-        try {
-            OrderResponse orderResponse = restTemplate.postForObject(
-                "http://34.230.32.169:8080/" + order.getBarId() + "/processOrder",
-                order,
-                OrderResponse.class
-            );
-        } catch (RestClientException e) {
-            e.printStackTrace();
-            sendErrorMessage(session, "Failed to send order to PostgreSQL.");
-            return;
-        }
+        redisOrderService.sendOrderToPostgres(order);
 
         // Broadcast the updated order to all bartenders
         Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
@@ -417,17 +410,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
         }
 
         // Send the order to PostgreSQL
-        try {
-            OrderResponse orderResponse = restTemplate.postForObject(
-                "http://34.230.32.169:8080/" + order.getBarId() + "/processOrder",
-                order,
-                OrderResponse.class
-            );
-        } catch (RestClientException e) {
-            e.printStackTrace();
-            sendErrorMessage(session, "Failed to send order to PostgreSQL.");
-            return;
-        }
+        redisOrderService.sendOrderToPostgres(order);
 
         // Broadcast the updated order to all bartenders
         Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
