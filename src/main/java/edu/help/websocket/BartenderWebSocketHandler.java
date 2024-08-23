@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -20,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.BartenderSession;
 import edu.help.dto.Order;
+import edu.help.dto.OrderResponse;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
@@ -37,13 +40,16 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>(); // Session storage
     private final OrderWebSocketHandler orderWebSocketHandler;
+    private final RestTemplate restTemplate;
 
     public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool,
-            OrderWebSocketHandler orderWebSocketHandler) {
+            OrderWebSocketHandler orderWebSocketHandler, RestTemplate restTemplate) {
         this.jedisPooled = jedisPooled;
         this.jedisPool = jedisPool;
         this.orderWebSocketHandler = orderWebSocketHandler;
         instance = this;
+        this.restTemplate = restTemplate;
+
     }
 
     // Getter for the singleton instance
@@ -285,152 +291,152 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Transactional
-    private void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-        int barID = (int) payload.get("barID");
-        int orderID = (int) payload.get("orderID");
-        String bartenderID = (String) payload.get("bartenderID");
+private void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    int barID = (int) payload.get("barID");
+    int orderID = (int) payload.get("orderID");
+    String bartenderID = (String) payload.get("bartenderID");
 
-        String orderRedisKey = barID + "." + orderID;
+    String orderRedisKey = barID + "." + orderID;
 
-        try (Jedis jedis = jedisPool.getResource()) {
-            jedis.watch(orderRedisKey); // Watch the key for changes
+    try (Jedis jedis = jedisPool.getResource()) {
+        jedis.watch(orderRedisKey); // Watch the key for changes
 
-            // Retrieve the JSON object from Redis
-            Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
+        // Retrieve the JSON object from Redis
+        Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
 
-            if (orderJsonObj == null) {
-                sendErrorMessage(session, "Order does not exist.");
-                jedis.unwatch(); // Unwatch if the order doesn't exist
-                return;
-            }
-
-            // Convert the retrieved Object to a JSON string
-            String orderJson;
-            try {
-                orderJson = objectMapper.writeValueAsString(orderJsonObj);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process order data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            // Deserialize the JSON string into an Order object
-            Order order;
-            try {
-                order = objectMapper.readValue(orderJson, Order.class);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process order data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            String currentClaimer = order.getClaimer();
-
-            if (!bartenderID.equals(currentClaimer)) {
-                sendErrorMessage(session, "You cannot deliver this order because it was claimed by another bartender.");
-                jedis.unwatch(); // Unwatch if the order was claimed by another bartender
-                return;
-            }
-
-            String currentStatus = order.getStatus();
-
-            if (!"ready".equals(currentStatus)) {
-                sendErrorMessage(session, "Only ready orders can be marked as delivered.");
-                jedis.unwatch(); // Unwatch if the order is not ready
-                return;
-            }
-
-            // Update the order to set status to "delivered"
-            order.setStatus("delivered");
-
-            Transaction transaction = jedis.multi(); // Start the transaction
-            String updatedOrderJson = objectMapper.writeValueAsString(order);
-            transaction.jsonSet(orderRedisKey, updatedOrderJson);
-            List<Object> results = transaction.exec(); // Execute the transaction
-
-            if (results == null || results.isEmpty()) {
-                sendErrorMessage(session, "Failed to deliver the order due to a conflict. Please try again.");
-                return;
-            }
-
-            // Broadcast the updated order to all bartenders
-            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-            broadcastToBar(barID, orderData);
-
-            orderWebSocketHandler.updateUser(orderData);
+        if (orderJsonObj == null) {
+            sendErrorMessage(session, "Order does not exist.");
+            jedis.unwatch(); // Unwatch if the order doesn't exist
+            return;
         }
-    }
 
-    @Transactional
-    private void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-        int barID = (int) payload.get("barID");
-        int orderID = (int) payload.get("orderID");
-        String cancelingBartenderID = (String) payload.get("bartenderID");
+        // Convert the retrieved Object to a JSON string
+        String orderJson = objectMapper.writeValueAsString(orderJsonObj);
 
-        String orderRedisKey = barID + "." + orderID;
+        // Deserialize the JSON string into an Order object
+        Order order = objectMapper.readValue(orderJson, Order.class);
 
-        try (Jedis jedis = jedisPool.getResource()) {
-            jedis.watch(orderRedisKey); // Watch the key for changes
+        String currentClaimer = order.getClaimer();
 
-            // Retrieve the JSON object from Redis
-            Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
-
-            if (orderJsonObj == null) {
-                sendErrorMessage(session, "Order does not exist.");
-                jedis.unwatch(); // Unwatch if the order doesn't exist
-                return;
-            }
-
-            // Convert the retrieved Object to a JSON string
-            String orderJson;
-            try {
-                orderJson = objectMapper.writeValueAsString(orderJsonObj);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process order data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            // Deserialize the JSON string into an Order object
-            Order order;
-            try {
-                order = objectMapper.readValue(orderJson, Order.class);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process order data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            // Check if the canceling bartender is the one who claimed the order
-            String currentClaimer = order.getClaimer();
-            if (!cancelingBartenderID.equals(currentClaimer)) {
-                sendErrorMessage(session, "You cannot cancel this order as it was claimed by another bartender.");
-                jedis.unwatch(); // Unwatch if the order was claimed by another bartender
-                return;
-            }
-
-            // Update the order status to "canceled"
-            order.setStatus("canceled");
-
-            // Start the transaction
-            Transaction transaction = jedis.multi();
-            // Serialize the updated Order object back to JSON and save it to Redis
-            String updatedOrderJson = objectMapper.writeValueAsString(order);
-            transaction.jsonSet(orderRedisKey, updatedOrderJson);
-            List<Object> results = transaction.exec(); // Execute the transaction
-
-            if (results == null || results.isEmpty()) {
-                sendErrorMessage(session, "Failed to cancel the order due to a conflict. Please try again.");
-                return;
-            }
-
-            // Broadcast the updated order to all bartenders
-            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-            broadcastToBar(barID, orderData);
-
-            orderWebSocketHandler.updateUser(orderData);
+        if (!bartenderID.equals(currentClaimer)) {
+            sendErrorMessage(session, "You cannot deliver this order because it was claimed by another bartender.");
+            jedis.unwatch(); // Unwatch if the order was claimed by another bartender
+            return;
         }
+
+        String currentStatus = order.getStatus();
+
+        if (!"ready".equals(currentStatus)) {
+            sendErrorMessage(session, "Only ready orders can be marked as delivered.");
+            jedis.unwatch(); // Unwatch if the order is not ready
+            return;
+        }
+
+        // Update the order to set status to "delivered"
+        order.setStatus("delivered");
+
+        Transaction transaction = jedis.multi(); // Start the transaction
+        String updatedOrderJson = objectMapper.writeValueAsString(order);
+        transaction.jsonSet(orderRedisKey, updatedOrderJson);
+        List<Object> results = transaction.exec(); // Execute the transaction
+
+        if (results == null || results.isEmpty()) {
+            sendErrorMessage(session, "Failed to deliver the order due to a conflict. Please try again.");
+            return;
+        }
+
+        // Send the order to PostgreSQL
+        try {
+            OrderResponse orderResponse = restTemplate.postForObject(
+                "http://34.230.32.169:8080/" + order.getBarId() + "/processOrder",
+                order,
+                OrderResponse.class
+            );
+        } catch (RestClientException e) {
+            e.printStackTrace();
+            sendErrorMessage(session, "Failed to send order to PostgreSQL.");
+            return;
+        }
+
+        // Broadcast the updated order to all bartenders
+        Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
+        broadcastToBar(barID, orderData);
+
+        orderWebSocketHandler.updateUser(orderData);
     }
+}
+
+
+@Transactional
+private void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    int barID = (int) payload.get("barID");
+    int orderID = (int) payload.get("orderID");
+    String cancelingBartenderID = (String) payload.get("bartenderID");
+
+    String orderRedisKey = barID + "." + orderID;
+
+    try (Jedis jedis = jedisPool.getResource()) {
+        jedis.watch(orderRedisKey); // Watch the key for changes
+
+        // Retrieve the JSON object from Redis
+        Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
+
+        if (orderJsonObj == null) {
+            sendErrorMessage(session, "Order does not exist.");
+            jedis.unwatch(); // Unwatch if the order doesn't exist
+            return;
+        }
+
+        // Convert the retrieved Object to a JSON string
+        String orderJson = objectMapper.writeValueAsString(orderJsonObj);
+
+        // Deserialize the JSON string into an Order object
+        Order order = objectMapper.readValue(orderJson, Order.class);
+
+        // Check if the canceling bartender is the one who claimed the order
+        String currentClaimer = order.getClaimer();
+        if (!cancelingBartenderID.equals(currentClaimer)) {
+            sendErrorMessage(session, "You cannot cancel this order as it was claimed by another bartender.");
+            jedis.unwatch(); // Unwatch if the order was claimed by another bartender
+            return;
+        }
+
+        // Update the order status to "canceled"
+        order.setStatus("canceled");
+
+        // Start the transaction
+        Transaction transaction = jedis.multi();
+        // Serialize the updated Order object back to JSON and save it to Redis
+        String updatedOrderJson = objectMapper.writeValueAsString(order);
+        transaction.jsonSet(orderRedisKey, updatedOrderJson);
+        List<Object> results = transaction.exec(); // Execute the transaction
+
+        if (results == null || results.isEmpty()) {
+            sendErrorMessage(session, "Failed to cancel the order due to a conflict. Please try again.");
+            return;
+        }
+
+        // Send the order to PostgreSQL
+        try {
+            OrderResponse orderResponse = restTemplate.postForObject(
+                "http://34.230.32.169:8080/" + order.getBarId() + "/processOrder",
+                order,
+                OrderResponse.class
+            );
+        } catch (RestClientException e) {
+            e.printStackTrace();
+            sendErrorMessage(session, "Failed to send order to PostgreSQL.");
+            return;
+        }
+
+        // Broadcast the updated order to all bartenders
+        Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
+        broadcastToBar(barID, orderData);
+
+        orderWebSocketHandler.updateUser(orderData);
+    }
+}
+
 
     @Transactional
     private void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
