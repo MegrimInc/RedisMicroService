@@ -180,8 +180,7 @@ public class OrderService {
 
 
     private String getCurrentTimestamp() {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
-        return ZonedDateTime.ofInstant(Instant.now(), ZoneId.systemDefault()).format(formatter);
+        return String.valueOf(System.currentTimeMillis());
     }
 
     public boolean deleteOrderIfExists(int barId, int userId) {
