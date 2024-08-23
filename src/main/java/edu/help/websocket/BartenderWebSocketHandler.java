@@ -171,7 +171,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                         continue; // Skip if deserialization fails
                     }
 
-                    if (bartenderSession != null && bartenderSession.getActive()) { // Changed from isActive() to getActive()
+                    if (bartenderSession != null && bartenderSession.getActive() && bartenderSession.getSessionId() != null) { // Changed from isActive() to getActive()
                         System.out.println("Bartender is active: " + bartenderID);
                         acceptingBartenders.add(bartenderSession);
                     }
