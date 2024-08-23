@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import edu.help.websocket.BartenderWebSocketHandler;
+
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
@@ -27,6 +27,7 @@ import edu.help.dto.Order;
 import edu.help.dto.OrderRequest;
 import edu.help.dto.OrderResponse;
 import edu.help.dto.ResponseWrapper;
+import edu.help.websocket.BartenderWebSocketHandler;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -37,33 +38,31 @@ public class OrderService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final JedisPooled jedis; // Redis client
-    //private final BartenderWebSocketHandler bartenderWebSocketHandler;
+    
 
     public OrderService(RestTemplate restTemplate, LettuceConnectionFactory redisConnectionFactory) {
         this.restTemplate = restTemplate;
         this.jedis = new JedisPooled(redisConnectionFactory.getHostName(), redisConnectionFactory.getPort());
-        //this.bartenderWebSocketHandler = bartenderWebSocketHandler;
+        
     }
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
-
-
-         // Fetch open and happyHour status from Redis
-         String barKey = String.valueOf(orderRequest.getBarId());
-         Boolean isOpen = Boolean.valueOf(jedis.hget(barKey, "open"));
-         Boolean isHappyHour = Boolean.valueOf(jedis.hget(barKey, "happyHour"));
- 
-         // Check if the bar is open
-         if (isOpen == null || !isOpen) {
-             sendOrderResponse(session, new ResponseWrapper(
-                 "error",
-                 null,  // No data, as the bar is closed
-                 "Failed to process order: The bar is currently closed."
-             ));
-             return;
-         }
-       
+    
+        // Fetch open and happyHour status from Redis
+        String barKey = String.valueOf(orderRequest.getBarId());
+        Boolean isOpen = Boolean.valueOf(jedis.hget(barKey, "open"));
+        Boolean isHappyHour = Boolean.valueOf(jedis.hget(barKey, "happyHour"));
+    
+        // Check if the bar is open
+        if (isOpen == null || !isOpen) {
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,  // No data, as the bar is closed
+                "Failed to process order: The bar is currently closed."
+            ));
+            return;
+        }
     
         // Check if the key already exists in Redis (for duplicate order prevention)
         String orderKey = generateOrderKey(orderRequest);
@@ -75,7 +74,6 @@ public class OrderService {
             ));
             return;
         }
-     
     
         // Set the happy hour status in the OrderRequest
         if (isHappyHour != null) {
@@ -109,7 +107,6 @@ public class OrderService {
                     getCurrentTimestamp(),
                     session.getId() 
                 );
-
     
                 jedis.jsonSetWithEscape(orderKey, order);
                 System.out.println("Stored order in Redis with key: " + orderKey);
@@ -119,15 +116,20 @@ public class OrderService {
                     order,  // Send the actual order data
                     "Order successfully processed."
                 ));
-                //NEW CODE FOR BROADCASTING TO BARS: UNTESTED
+    
+                // Initialize the data map for broadcasting
                 Map<String, Object> data = new HashMap<>();
                 data.put("orders", order);
-
-
-                // Send the JSON message
-                //bartenderWebSocketHandler.broadcastToBar(orderRequest.getBarId(), data);
-
-            } 
+    
+                // Broadcast the new order to the bartenders
+                try {
+                    BartenderWebSocketHandler.getInstance().broadcastToBar(orderRequest.getBarId(), data);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    // Handle the exception if necessary, or log the error
+                }
+            }
+    
         } catch (RestClientException e) {
             e.printStackTrace();
             sendOrderResponse(session, new ResponseWrapper(
@@ -135,12 +137,9 @@ public class OrderService {
                 null,  // No data, as an exception occurred
                 "Failed to process order: No response from PostgreSQL."
             ));
-         } //catch (JsonProcessingException e) {
-        //     throw new RuntimeException(e);
-        // } catch (IOException e) {
-        //     throw new RuntimeException(e);
-        // }
+        } 
     }
+    
 
     private List<Order.DrinkOrder> convertDrinksToOrders(List<OrderResponse.DrinkOrder> drinkResponses) {
         return drinkResponses.stream()

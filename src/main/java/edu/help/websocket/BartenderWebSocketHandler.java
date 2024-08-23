@@ -30,6 +30,7 @@ import redis.clients.jedis.resps.ScanResult;
 @Component
 public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
+    private static BartenderWebSocketHandler instance;
     private final JedisPooled jedisPooled;
     private final JedisPool jedisPool;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -37,11 +38,18 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     private final OrderWebSocketHandler orderWebSocketHandler;
 
     public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool,
-                                     OrderWebSocketHandler orderWebSocketHandler) {
+            OrderWebSocketHandler orderWebSocketHandler) {
         this.jedisPooled = jedisPooled;
         this.jedisPool = jedisPool;
         this.orderWebSocketHandler = orderWebSocketHandler;
+        instance = this;
     }
+    
+     // Getter for the singleton instance
+     public static BartenderWebSocketHandler getInstance() {
+        return instance;
+    }
+
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
