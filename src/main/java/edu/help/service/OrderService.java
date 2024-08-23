@@ -1,10 +1,6 @@
 package edu.help.service;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,13 +18,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import edu.help.dto.Order;
 import edu.help.dto.OrderRequest;
 import edu.help.dto.OrderResponse;
 import edu.help.dto.ResponseWrapper;
 import edu.help.websocket.BartenderWebSocketHandler;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.Transaction;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
@@ -185,25 +184,25 @@ public class OrderService {
 
     public boolean deleteOrderIfExists(int barId, int userId) {
         String key = String.format("%d.%d", barId, userId);
-        
+
         System.out.println("Checking existence of key: " + key);
-        
+
         if (jedis.exists(key)) {
             System.out.println("Key exists. Retrieving JSON data...");
-            
+
             try {
                 Object JsonObject = jedis.jsonGet(key);
-                
+
                 System.out.println("Raw JSON String: " + JsonObject);
-                
+
                 if (JsonObject != null) {
                     String jsonString = objectMapper.writeValueAsString(JsonObject);
                     JsonNode jsonNode = objectMapper.readTree(jsonString);
-                    
+
                     String claimer = jsonNode.path("claimer").asText("");
-                    
+
                     System.out.println("Claimer field value: " + claimer);
-                    
+
                     if (claimer.isEmpty()) {
                         System.out.println("Claimer is empty. Deleting key: " + key);
                         jedis.del(key);
@@ -221,9 +220,70 @@ public class OrderService {
         } else {
             System.out.println("Key does not exist.");
         }
-        
+
         return false;
     }
+    
+
+    // public boolean cancelOrderIfUnclaimed(int barId, int userId) {
+    //     String key = String.format("%d.%d", barId, userId);
+        
+    //     try (Jedis jedis = jedisPool.getResource()) {
+    //         jedis.watch(key); // Watch the key to avoid concurrent modifications
+            
+    //         Object jsonObject = jedis.jsonGet(key); // Retrieve the JSON object
+            
+    //         if (jsonObject == null) {
+    //             System.out.println("Key does not exist.");
+    //             jedis.unwatch(); // Unwatch if the key does not exist
+    //             return false;
+    //         }
+            
+    //         // Convert the retrieved JSON object to a JSON string
+    //         String jsonString = objectMapper.writeValueAsString(jsonObject);
+    //         JsonNode jsonNode = objectMapper.readTree(jsonString);
+            
+    //         String claimer = jsonNode.path("claimer").asText("");
+            
+    //         if (claimer.isEmpty()) {
+    //             // Start a transaction
+    //             Transaction transaction = jedis.multi();
+                
+    //             // Update the status to "canceled"
+    //             JsonNode updatedJsonNode = jsonNode.deepCopy();
+    //             ((ObjectNode) updatedJsonNode).put("status", "canceled");
+    //             String updatedJsonString = objectMapper.writeValueAsString(updatedJsonNode);
+                
+    //             // Set the updated JSON back to Redis
+    //             transaction.jsonSet(key, updatedJsonString);
+                
+    //             List<Object> results = transaction.exec(); // Execute the transaction
+                
+    //             if (results == null || results.isEmpty()) {
+    //                 System.out.println("Failed to update the order status due to a conflict. Please try again.");
+    //                 return false;
+    //             }
+                
+    //             System.out.println("Order status updated to 'canceled'.");
+    //             return true;
+    //         } else {
+    //             System.out.println("Order has a claimer; no action taken.");
+    //             jedis.unwatch(); // Unwatch if the claimer is not empty
+    //             return false;
+    //         }
+    //     } catch (Exception e) {
+    //         System.err.println("Error processing order: " + e.getMessage());
+    //         e.printStackTrace();
+    //         return false;
+    //     }
+    // }
+
+
+
+
+
+
+
     
     public void refreshOrdersForUser(int userId, WebSocketSession session) {
         ScanParams scanParams = new ScanParams().match("*." + userId);
