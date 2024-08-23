@@ -666,8 +666,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
         if (bartenderID == null || bartenderID.isEmpty() || !bartenderID.matches("[a-zA-Z]+")) {
             // Send an error response
-            sendErrorMessage(session,
-                    "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
+            sendErrorMessage(session, "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
             return;
         }
 
@@ -719,7 +718,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
-            session.sendMessage(new TextMessage("Bartender " + bartenderID + " is now disabled."));
+            // Send a success response to the client
+            session.sendMessage(new TextMessage("{\"disable\":\"true\"}"));
 
             // Notify all bartenders of active WebSocket connections
             notifyBartendersOfActiveConnections(barID);
@@ -729,6 +729,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             sendErrorMessage(session, "An error occurred while disabling the bartender. Please try again.");
         }
     }
+
 
     private void sendErrorMessage(WebSocketSession session, String errorMessage) throws IOException {
         Map<String, String> errorResponse = new HashMap<>();
