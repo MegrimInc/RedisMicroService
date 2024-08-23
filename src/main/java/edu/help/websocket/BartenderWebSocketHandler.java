@@ -950,10 +950,10 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
                 happyHourMessage.put("barStatus", barStatus1);
 
                 session.sendMessage(new TextMessage(happyHourMessage.toString()));
-                System.out.println("Sent happy hour status to session: " + session.getId());
+                System.out.println("Sent bar status to session: " + session.getId());
             } else {
                 // Send an error or default status if happy hour status is not found
-                sendErrorMessage(session, "Failed to retrieve happy hour status.");
+                sendErrorMessage(session, "Failed to retrieve bar status.");
             }
 
             String happyHourStatus = jedis.hget(String.valueOf(barID), "happyHour");
