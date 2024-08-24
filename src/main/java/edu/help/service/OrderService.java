@@ -6,8 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -16,7 +14,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 
@@ -25,9 +23,11 @@ import edu.help.dto.OrderRequest;
 import edu.help.dto.OrderResponse;
 import edu.help.dto.ResponseWrapper;
 import edu.help.websocket.BartenderWebSocketHandler;
-
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
-
+import redis.clients.jedis.Transaction;
+import redis.clients.jedis.json.commands.RedisJsonV1Commands;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
@@ -36,13 +36,15 @@ public class OrderService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final JedisPooled jedis; // Redis client
+ 
+    private final JedisPooled jedisPooled; // Redis client for simple operations
+    private final JedisPool jedisPool; // Redis connection pool for transactions
     
 
-    public OrderService(RestTemplate restTemplate, LettuceConnectionFactory redisConnectionFactory) {
+    public OrderService(RestTemplate restTemplate, JedisPooled jedisPooled, JedisPool jedisPool) {
         this.restTemplate = restTemplate;
-        this.jedis = new JedisPooled(redisConnectionFactory.getHostName(), redisConnectionFactory.getPort());
-        
+        this.jedisPooled = jedisPooled;
+        this.jedisPool = jedisPool;
     }
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
@@ -50,8 +52,8 @@ public class OrderService {
     
         // Fetch open and happyHour status from Redis
         String barKey = String.valueOf(orderRequest.getBarId());
-        Boolean isOpen = Boolean.valueOf(jedis.hget(barKey, "open"));
-        Boolean isHappyHour = Boolean.valueOf(jedis.hget(barKey, "happyHour"));
+        Boolean isOpen = Boolean.valueOf(jedisPooled.hget(barKey, "open"));
+        Boolean isHappyHour = Boolean.valueOf(jedisPooled.hget(barKey, "happyHour"));
     
         // Check if the bar is open
         if (isOpen == null || !isOpen) {
@@ -63,16 +65,64 @@ public class OrderService {
             return;
         }
     
-        // Check if the key already exists in Redis (for duplicate order prevention)
         String orderKey = generateOrderKey(orderRequest);
-        if (jedis.exists(orderKey)) {
-            sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,  // No data, as the order is already in progress
-                "Order already in progress for barId: " + orderRequest.getBarId()
-            ));
-            return;
+        System.out.println("Generated order key: " + orderKey);
+        
+        if (jedisPooled.exists(orderKey)) {
+            System.out.println("Order key exists in Redis: " + orderKey);
+            
+            // Retrieve the JSON object as a raw object
+            Object orderJsonObj = jedisPooled.jsonGet(orderKey);
+            System.out.println("Raw JSON object retrieved: " + orderJsonObj);
+        
+            if (orderJsonObj != null) {
+                // Convert the JSON object to a string
+                String orderJson;
+                try {
+                    orderJson = objectMapper.writeValueAsString(orderJsonObj);
+                    System.out.println("Order JSON string: " + orderJson);
+                } catch (JsonProcessingException e) {
+                    System.err.println("Failed to serialize existing order data: " + e.getMessage());
+                    sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Failed to process existing order data."
+                    ));
+                    return;
+                }
+        
+                // Deserialize the string back into an Order object
+                Order existingOrder;
+                try {
+                    existingOrder = objectMapper.readValue(orderJson, Order.class);
+                    System.out.println("Deserialized Order object: " + existingOrder);
+                } catch (JsonProcessingException e) {
+                    System.err.println("Failed to deserialize existing order data: " + e.getMessage());
+                    sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Failed to process existing order data."
+                    ));
+                    return;
+                }
+        
+                // Check the status of the existing order
+                String existingStatus = existingOrder.getStatus();
+                System.out.println("Existing order status: " + existingStatus);
+        
+                if (!"delivered".equals(existingStatus) && !"canceled".equals(existingStatus)) {
+                    System.out.println("Order already in progress, status: " + existingStatus);
+                    sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Order already in progress for barId: " + orderRequest.getBarId()
+                    ));
+                    return;
+                }
+            }
         }
+        
+        System.out.println("No existing order in progress or status is 'delivered' or 'canceled'. Proceeding with order processing.");
     
         // Set the happy hour status in the OrderRequest
         if (isHappyHour != null) {
@@ -107,7 +157,7 @@ public class OrderService {
                     session.getId() 
                 );
     
-                jedis.jsonSetWithEscape(orderKey, order);
+                jedisPooled.jsonSetWithEscape(orderKey, order);
                 System.out.println("Stored order in Redis with key: " + orderKey);
     
                 sendOrderResponse(session, new ResponseWrapper(
@@ -182,103 +232,129 @@ public class OrderService {
         return String.valueOf(System.currentTimeMillis());
     }
 
-    public boolean deleteOrderIfExists(int barId, int userId) {
-        String key = String.format("%d.%d", barId, userId);
+   
+    public void cancelOrderIfUnclaimed(int barId, int userId, WebSocketSession session) {
+    String key = String.format("%d.%d", barId, userId);
+    System.out.println("Attempting to cancel order for key: " + key);
 
-        System.out.println("Checking existence of key: " + key);
+    try (Jedis jedis = jedisPool.getResource()) {
+        System.out.println("Obtained Jedis instance from the pool.");
+        jedis.watch(key);
+        System.out.println("Watching key: " + key);
 
-        if (jedis.exists(key)) {
-            System.out.println("Key exists. Retrieving JSON data...");
+        // Retrieve the JSON object as a raw object
+        Object orderJsonObj = jedisPooled.jsonGet(key);
 
-            try {
-                Object JsonObject = jedis.jsonGet(key);
-
-                System.out.println("Raw JSON String: " + JsonObject);
-
-                if (JsonObject != null) {
-                    String jsonString = objectMapper.writeValueAsString(JsonObject);
-                    JsonNode jsonNode = objectMapper.readTree(jsonString);
-
-                    String claimer = jsonNode.path("claimer").asText("");
-
-                    System.out.println("Claimer field value: " + claimer);
-
-                    if (claimer.isEmpty()) {
-                        System.out.println("Claimer is empty. Deleting key: " + key);
-                        jedis.del(key);
-                        return true;
-                    } else {
-                        System.out.println("Claimer is not empty. No action taken.");
-                    }
-                } else {
-                    System.out.println("JSON String is null or empty.");
-                }
-            } catch (JsonProcessingException e) {
-                System.err.println("Error processing JSON data: " + e.getMessage());
-                e.printStackTrace();
-            }
-        } else {
-            System.out.println("Key does not exist.");
+        if (orderJsonObj == null) {
+            System.out.println("Key does not exist, unwatching.");
+            jedis.unwatch();
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,
+                "Order does not exist."
+            ));
+            return;
         }
 
-        return false;
+        // Convert the JSON object to a string
+        String orderJson;
+        try {
+            orderJson = objectMapper.writeValueAsString(orderJsonObj);
+        } catch (JsonProcessingException e) {
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,
+                "Failed to process order data."
+            ));
+            jedis.unwatch(); // Unwatch if processing fails
+            return;
+        }
+
+        // Deserialize the string back into an Order object
+        Order order;
+        try {
+            order = objectMapper.readValue(orderJson, Order.class);
+        } catch (JsonProcessingException e) {
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,
+                "Failed to process order data."
+            ));
+            jedis.unwatch(); // Unwatch if processing fails
+            return;
+        }
+
+        // Check the claimer field in the Order object
+        String claimer = order.getClaimer();
+        System.out.println("Claimer field value: " + claimer);
+
+        if (!claimer.isEmpty()) {
+            System.out.println("Order has a claimer; no action taken. Unwatching key.");
+            jedis.unwatch();
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,
+                "Order can no longer be canceled."
+            ));
+            return;
+        }
+
+        System.out.println("Claimer is empty, proceeding with transaction.");
+        Transaction transaction = jedis.multi();
+        System.out.println("Transaction started.");
+
+        // Update the status to "canceled"
+        order.setStatus("canceled");
+        order.setClaimer(String.valueOf(userId));
+        System.out.println("Order status set to canceled.");
+
+        // Serialize the updated order back to JSON
+        String updatedOrderJson;
+        try {
+            updatedOrderJson = objectMapper.writeValueAsString(order);
+        } catch (JsonProcessingException e) {
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,
+                "Failed to serialize updated order data."
+            ));
+            jedis.unwatch(); // Unwatch if processing fails
+            return;
+        }
+
+        // Set the updated JSON string back into Redis
+        transaction.jsonSet(key, updatedOrderJson);
+        System.out.println("Updated Order set back to Redis.");
+
+        List<Object> results = transaction.exec();
+        System.out.println("Transaction executed. Results: " + results);
+
+        if (results == null || results.isEmpty()) {
+            System.out.println("Failed to update the order status due to a conflict. Please try again.");
+            sendOrderResponse(session, new ResponseWrapper(
+                "error",
+                null,
+                "Failed to cancel the order due to a conflict. Please try again."
+            ));
+            return;
+        }
+
+        System.out.println("Order status updated to 'canceled'.");
+        sendOrderResponse(session, new ResponseWrapper(
+            "delete",
+            null,
+            "Order canceled successfully."
+        ));
+    } catch (Exception e) {
+        System.err.println("Error processing order: " + e.getMessage());
+        e.printStackTrace();
+        sendOrderResponse(session, new ResponseWrapper(
+            "error",
+            null,
+            "Error occurred while processing the order."
+        ));
     }
-    
-
-    // public boolean cancelOrderIfUnclaimed(int barId, int userId) {
-    //     String key = String.format("%d.%d", barId, userId);
-        
-    //     try (Jedis jedis = jedisPool.getResource()) {
-    //         jedis.watch(key); // Watch the key to avoid concurrent modifications
-            
-    //         Object jsonObject = jedis.jsonGet(key); // Retrieve the JSON object
-            
-    //         if (jsonObject == null) {
-    //             System.out.println("Key does not exist.");
-    //             jedis.unwatch(); // Unwatch if the key does not exist
-    //             return false;
-    //         }
-            
-    //         // Convert the retrieved JSON object to a JSON string
-    //         String jsonString = objectMapper.writeValueAsString(jsonObject);
-    //         JsonNode jsonNode = objectMapper.readTree(jsonString);
-            
-    //         String claimer = jsonNode.path("claimer").asText("");
-            
-    //         if (claimer.isEmpty()) {
-    //             // Start a transaction
-    //             Transaction transaction = jedis.multi();
-                
-    //             // Update the status to "canceled"
-    //             JsonNode updatedJsonNode = jsonNode.deepCopy();
-    //             ((ObjectNode) updatedJsonNode).put("status", "canceled");
-    //             String updatedJsonString = objectMapper.writeValueAsString(updatedJsonNode);
-                
-    //             // Set the updated JSON back to Redis
-    //             transaction.jsonSet(key, updatedJsonString);
-                
-    //             List<Object> results = transaction.exec(); // Execute the transaction
-                
-    //             if (results == null || results.isEmpty()) {
-    //                 System.out.println("Failed to update the order status due to a conflict. Please try again.");
-    //                 return false;
-    //             }
-                
-    //             System.out.println("Order status updated to 'canceled'.");
-    //             return true;
-    //         } else {
-    //             System.out.println("Order has a claimer; no action taken.");
-    //             jedis.unwatch(); // Unwatch if the claimer is not empty
-    //             return false;
-    //         }
-    //     } catch (Exception e) {
-    //         System.err.println("Error processing order: " + e.getMessage());
-    //         e.printStackTrace();
-    //         return false;
-    //     }
-    // }
-
-
+}
 
 
 
@@ -292,15 +368,15 @@ public class OrderService {
 
         try {
             do {
-                ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
+                ScanResult<String> scanResult = jedisPooled.scan(cursor, scanParams);
                 cursor = scanResult.getCursor();
 
                 for (String key : scanResult.getResult()) {
-                    String type = jedis.type(key);
+                    String type = jedisPooled.type(key);
                     System.out.println("Data type of key: " + type);
 
                     if ("ReJSON-RL".equals(type)) {
-                        Object jsonObject = jedis.jsonGet(key);
+                        Object jsonObject = jedisPooled.jsonGet(key);
 
                         System.out.println("Raw JSON from Redis: " + jsonObject);
 
@@ -315,7 +391,7 @@ public class OrderService {
                             String updatedJsonString = objectMapper.writeValueAsString(orderMap);
 
                             // Store the updated JSON string back in Redis under the same key
-                            jedis.jsonSet(key, updatedJsonString);
+                            jedisPooled.jsonSet(key, updatedJsonString);
 
                             System.out.println("Updated sessionId in Redis for key: " + key);
 

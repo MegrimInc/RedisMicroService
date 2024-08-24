@@ -65,7 +65,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String payload = message.getPayload();
             System.out.println("Bartender WebSocket message received: " + payload);
 
-            System.out.println("Let me confirm you work");
 
             // Parse the JSON message
             Map<String, Object> payloadMap = objectMapper.readValue(payload, Map.class);

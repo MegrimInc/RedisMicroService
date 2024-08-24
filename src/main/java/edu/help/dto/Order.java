@@ -29,6 +29,20 @@ public class Order {
     public Order() {
     }
 
+    @Override
+public String toString() {
+    return "Order{" +
+            "barId=" + barId +
+            ", userId=" + userId +
+            ", price=" + price +
+            ", drinks=" + drinks +
+            ", status='" + status + '\'' +
+            ", claimer='" + claimer + '\'' +
+            ", timestamp='" + timestamp + '\'' +
+            ", sessionId='" + sessionId + '\'' +
+            '}';
+}
+
 
     // Getters and setters
     @JsonProperty("barId")
@@ -125,6 +139,15 @@ public class Order {
         public DrinkOrder() {
 
         }
+
+        @Override
+        public String toString() {
+    return "DrinkOrder{" +
+            "id=" + id +
+            ", drinkName='" + drinkName + '\'' +
+            ", quantity=" + quantity +
+            '}';
+}
 
         @JsonProperty("id")
         public int getId() {
