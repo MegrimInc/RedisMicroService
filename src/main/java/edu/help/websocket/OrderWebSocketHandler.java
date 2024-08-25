@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -85,20 +84,8 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
                     case "delete":
                     int barId = (int) payloadMap.get("barId");
                     int userId = (int) payloadMap.get("userId");
-                    boolean deleted = orderService.deleteOrderIfExists(barId, userId);
-                    if (deleted) {
-                        sendOrderResponse(session, new ResponseWrapper(
-                            "delete",
-                            null,
-                            "Order deleted successfully."
-                        ));
-                    } else {
-                        sendOrderResponse(session, new ResponseWrapper(
-                            "error",
-                            null,
-                            "Order does not exist."
-                        ));
-                    }
+                    orderService.cancelOrderIfUnclaimed(barId, userId, session);
+                    
                     break;
                 case "refresh":
 
@@ -156,22 +143,24 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
         String status = (String) orderData.get("status");
         String claimer = (String) orderData.get("claimer");
         String sessionId = (String) orderData.get("sessionId");
-
-        // Prepare the data to be sent to the user
-        Map<String, Object> updateData = new HashMap<>();
-        updateData.put("barId", barId);
-        updateData.put("status", status);
-        updateData.put("claimer", claimer);
-
-        // Convert the map to a JSON string using ObjectMapper
-        String message = objectMapper.writeValueAsString(updateData);
-
+    
         // Retrieve the session from the sessionMap using the sessionId
         WebSocketSession userSession = sessionMap.get(sessionId);
-
+    
         // If the session is found and open, send the message
         if (userSession != null && userSession.isOpen()) {
-            userSession.sendMessage(new TextMessage(message));
+            // Create a ResponseWrapper with the update information
+            ResponseWrapper response = new ResponseWrapper(
+                "update",            // messageType
+                orderData,           // data to send
+                "Order update successful."  // message
+            );
+            
+            // Convert the ResponseWrapper to a JSON string
+            String jsonResponse = objectMapper.writeValueAsString(response);
+            
+            // Send the response to the user
+            userSession.sendMessage(new TextMessage(jsonResponse));
         } else {
             System.err.println("User session not found or closed: " + sessionId);
         }

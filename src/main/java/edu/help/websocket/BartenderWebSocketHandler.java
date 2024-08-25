@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -22,7 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.BartenderSession;
 import edu.help.dto.Order;
-import edu.help.dto.OrderResponse;
 import edu.help.service.RedisOrderService;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -67,6 +65,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String payload = message.getPayload();
             System.out.println("Bartender WebSocket message received: " + payload);
 
+
             // Parse the JSON message
             Map<String, Object> payloadMap = objectMapper.readValue(payload, Map.class);
 
@@ -78,6 +77,79 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                 case "initialize":
                     handleInitializeAction(session, payloadMap);
                     break;
+
+                case "happyHour":
+                    int barID3 = (int) payloadMap.get("barID");
+                    String barKey3 = String.valueOf(barID3);  // Adjust this to match your specific key format
+
+                    try (Jedis jedis = jedisPool.getResource()) {
+                        jedis.watch(barKey3);
+
+                        // Check if happy hour is already active
+                        boolean isHappyHourActive = Boolean.parseBoolean(jedis.hget(barKey3, "happyHour"));
+                        if (isHappyHourActive) {
+                            sendErrorMessage(session, "Happy Hour is already active.");
+                            jedis.unwatch();
+                            break;
+                        }
+
+                        Transaction transaction = jedis.multi();
+                        transaction.hset(barKey3, "happyHour", "true");
+                        // Include any other fields that need to be set during happy hour activation
+                        List<Object> results = transaction.exec();
+
+                        if (results != null) {
+                            // Notify all bartenders if the transaction was successful
+                            Map<String, Object> happyHourPayload = new HashMap<>();
+                            happyHourPayload.put("happyHour", true);
+
+                            // Use the existing broadcastToBar method to notify all bartenders
+                            broadcastToBar(barID3, happyHourPayload);
+                        } else {
+                            sendErrorMessage(session, "Failed to start Happy Hour due to a race condition.");
+                        }
+
+                    } catch (Exception e) {
+                        sendErrorMessage(session, "An error occurred while starting Happy Hour.");
+                    }
+                    break;
+
+                case "sadHour":
+                    int barID4 = (int) payloadMap.get("barID");
+                    String barKey4 = String.valueOf(barID4);  // Adjust this to match your specific key format
+
+                    try (Jedis jedis = jedisPool.getResource()) {
+                        jedis.watch(barKey4);
+
+                        // Check if happy hour is already inactive
+                        boolean isHappyHourInactive = !Boolean.parseBoolean(jedis.hget(barKey4, "happyHour"));
+                        if (isHappyHourInactive) {
+                            sendErrorMessage(session, "Happy Hour is already inactive.");
+                            jedis.unwatch();
+                            break;
+                        }
+
+                        Transaction transaction = jedis.multi();
+                        transaction.hset(barKey4, "happyHour", "false");
+                        // Include any other fields that need to be set during sad hour activation
+                        List<Object> results = transaction.exec();
+
+                        if (results != null) {
+                            // Notify all bartenders if the transaction was successful
+                            Map<String, Object> sadHourPayload = new HashMap<>();
+                            sadHourPayload.put("happyHour", false);
+
+                            // Use the existing broadcastToBar method to notify all bartenders
+                            broadcastToBar(barID4, sadHourPayload);
+                        } else {
+                            sendErrorMessage(session, "Failed to end Happy Hour due to a race condition.");
+                        }
+
+                    } catch (Exception e) {
+                        sendErrorMessage(session, "An error occurred while ending Happy Hour.");
+                    }
+                    break;
+
 
                 case "refresh":
                     handleRefreshAction(session, payloadMap);
@@ -108,32 +180,80 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     break;
 
                 case "open":
-                    // ADD CHECK HERE TO BAR, INCLUDE RACE CONDITIONS.
-                    int barID4 = (int) payloadMap.get("barID");
+                    int barID = (int) payloadMap.get("barID");
+                    String barKey = String.valueOf(barID);  // Adjust this to match your specific key format
 
-                    // Prepare the data to be broadcasted to all bartenders
-                    Map<String, Object> openPayload = new HashMap<>();
-                    openPayload.put("barStatus", true);
+                    try (Jedis jedis = jedisPool.getResource()) {
+                        jedis.watch(barKey);
 
-                    // Broadcast the bar open status to all bartenders
-                    broadcastToBar(barID4, openPayload);
+                        // Check if the bar is already open
+                        boolean isBarOpen = Boolean.parseBoolean(jedis.hget(barKey, "open"));
+                        if (isBarOpen) {
+                            sendErrorMessage(session, "Bar is already open.");
+                            jedis.unwatch();
+                            break;
+                        }
 
-                    // No need to send a separate response to the bartender who initiated the open action
+                        Transaction transaction = jedis.multi();
+                        transaction.hset(barKey, "open", "true");
+                        // Include any other fields that need to be set during opening
+                        List<Object> results = transaction.exec();
+
+                        if (results != null) {
+                            // Notify all bartenders if the transaction was successful
+                            Map<String, Object> openPayload = new HashMap<>();
+                            openPayload.put("barStatus", true);
+
+                            // Convert the map to a JSON string (if needed)
+
+                            // Use the existing broadcastToBar method to notify all bartenders
+                            broadcastToBar(barID, openPayload);
+                        } else {
+                            sendErrorMessage(session, "Failed to open the bar due to a race condition.");
+                        }
+
+                    } catch (Exception e) {
+                        sendErrorMessage(session, "An error occurred while opening the bar.");
+                    }
                     break;
 
                 case "close":
-                    // ADD CHECK HERE TO BAR, INCLUDE RACE CONDITIONS
-                    int barID0 = (int) payloadMap.get("barID");
+                    int barID2 = (int) payloadMap.get("barID");
+                    String barKey2 = String.valueOf(barID2);  // Adjust this to match your specific key format
 
-                    // Prepare the data to be broadcasted to all bartenders
-                    Map<String, Object> closePayload0 = new HashMap<>();
-                    closePayload0.put("barStatus", false);
+                    try (Jedis jedis = jedisPool.getResource()) {
+                        jedis.watch(barKey2);
 
-                    // Broadcast the bar close status to all bartenders
-                    broadcastToBar(barID0, closePayload0);
+                        // Check if the bar is already closed
+                        boolean isBarClosed = !Boolean.parseBoolean(jedis.hget(barKey2, "open"));
+                        if (isBarClosed) {
+                            sendErrorMessage(session, "Bar is already closed.");
+                            jedis.unwatch();
+                            break;
+                        }
 
-                    // No need to send a separate response to the bartender who initiated the close action
+                        Transaction transaction = jedis.multi();
+                        transaction.hset(barKey2, "open", "false");
+                        // Include any other fields that need to be set during closing
+                        List<Object> results = transaction.exec();
+
+                        if (results != null) {
+                            // Notify all bartenders if the transaction was successful
+                            Map<String, Object> closePayload = new HashMap<>();
+                            closePayload.put("barStatus", false);
+
+                            // Use the existing broadcastToBar method to notify all bartenders
+                            broadcastToBar(barID2, closePayload);
+                        } else {
+                            sendErrorMessage(session, "Failed to close the bar due to a race condition.");
+                        }
+
+                    } catch (Exception e) {
+                        sendErrorMessage(session, "An error occurred while closing the bar.");
+                    }
                     break;
+
+
 
                 default:
                     sendErrorMessage(session, "Unknown action: " + action);
@@ -144,6 +264,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             sendErrorMessage(session, "An error occurred while processing the message.");
         }
     }
+
+
 
     private void notifyBartendersOfActiveConnections(int barID) {
         System.out.println("notifyBartendersOfActiveConnections triggered with barID: " + barID);
@@ -221,6 +343,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+
+
     @Transactional
     private void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
 
@@ -291,6 +415,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             // Notify each bartender of active WebSocket connections
             notifyBartendersOfActiveConnections(barID);
             handleRefreshAction(session, payload);
+
+
         }
     }
 
@@ -735,85 +861,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
     }
 
-    // @Transactional
-    // private void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-    //     int barID = (int) payload.get("barID");
-
-    //     try (Jedis jedis = jedisPool.getResource()) {
-    //         // Prepare to scan Redis for keys matching the pattern
-    //         ScanParams scanParams = new ScanParams().match(barID + ".*");
-    //         String cursor = "0";
-
-    //         List<Order> orders = new ArrayList<>();
-
-    //         System.out.println("Scanning Redis with pattern: " + barID + ".*");
-    //         System.out.println("Initial cursor value: " + cursor);
-
-    //         do {
-    //             // Scan for keys with the given pattern
-    //             ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
-    //             cursor = scanResult.getCursor();
-    //             List<String> keys = scanResult.getResult();
-
-    //             // Print out the keys being scanned
-    //             System.out.println("Keys scanned in this iteration:");
-    //             for (String key : keys) {
-    //                 System.out.println(" - " + key);
-    //             }
-
-    //             // Process each key
-    //             for (String key : keys) {
-    //                 // Check the data type of the key
-    //                 String type = jedis.type(key);
-    //                 System.out.println("Data type of key: " + type);
-
-    //                 if ("ReJSON-RL".equals(type)) { // Ensure we're dealing with the expected JSON type
-    //                     Object jsonObject = jedisPooled.jsonGet(key);
-    //                     System.out.println("Raw JSON from Redis: " + jsonObject);
-
-    //                     if (jsonObject != null && !jsonObject.toString().contains("active")) { // Filter out session-related data
-    //                         // Convert JSON to Order object
-    //                         Order order = objectMapper.convertValue(jsonObject, Order.class);
-    //                         orders.add(order);
-    //                     } else {
-    //                         System.out.println("Skipping session-related data for key: " + key);
-    //                     }
-    //                 } else {
-    //                     System.err.println("Skipping key with unsupported type: " + key);
-    //                 }
-    //             }
-    //         } while (!"0".equals(cursor)); // Continue scanning until cursor is "0"
-
-    //         // Convert the list of Order objects to JSON and send it to the client
-    //         if (!orders.isEmpty()) {
-    //             String ordersJsonArray = objectMapper.writeValueAsString(orders);
-    //             String responseJson = "{\"orders\":" + ordersJsonArray + "}";
-    //             session.sendMessage(new TextMessage(responseJson));
-    //         } else {
-    //             session.sendMessage(new TextMessage("{\"orders\":[]}"));
-    //         }
-
-    //         String barKey = String.valueOf(barID);
-    //         Object barData = jedisPooled.jsonGet(barKey);
-
-    //         if (barData != null) {
-    //             // Assuming barData is a JSON object with multiple fields, including "barStatus"
-    //             Map<String, Object> barDataMap = objectMapper.convertValue(barData, Map.class);
-    //             Boolean barStatus = (Boolean) barDataMap.get("open");
-
-    //             // Send the barStatus back to the client
-    //             String barStatusJson = "{\"barStatus\":" + barStatus + "}";
-    //             session.sendMessage(new TextMessage(barStatusJson));
-    //         } else {
-    //             System.out.println("Bar key not found: " + barKey);
-    //             session.sendMessage(new TextMessage("{\"barStatus\":false}"));  // Defaulting to false if key doesn't exist
-    //         }
-    //     } catch (Exception e) {
-    //         e.printStackTrace(); // Handle exceptions
-    //         sendErrorMessage(session, "Error retrieving orders");
-    //     }
-    // }
-
+    
 
     @Transactional
     private void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
@@ -896,10 +944,45 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
                 session.sendMessage(new TextMessage("{\"orders\":[]}"));
             }
 
+            String barStatus = jedis.hget(String.valueOf(barID), "open");
+
+            if (barStatus != null) {
+                boolean barStatus1 = barStatus.equals("true");
+
+                JSONObject happyHourMessage = new JSONObject();
+                happyHourMessage.put("barStatus", barStatus1);
+
+                session.sendMessage(new TextMessage(happyHourMessage.toString()));
+                System.out.println("Sent bar status to session: " + session.getId());
+            } else {
+                // Send an error or default status if happy hour status is not found
+                sendErrorMessage(session, "Failed to retrieve bar status.");
+            }
+
+            String happyHourStatus = jedis.hget(String.valueOf(barID), "happyHour");
+
+            if (happyHourStatus != null) {
+                boolean isHappyHour = happyHourStatus.equals("true");
+
+                JSONObject happyHourMessage = new JSONObject();
+                happyHourMessage.put("happyHour", isHappyHour);
+
+                session.sendMessage(new TextMessage(happyHourMessage.toString()));
+                System.out.println("Sent happy hour status to session: " + session.getId());
+            } else {
+                // Send an error or default status if happy hour status is not found
+                sendErrorMessage(session, "Failed to retrieve happy hour status.");
+            }
+
+
+
         } catch (Exception e) {
             e.printStackTrace(); // Handle exceptions
             sendErrorMessage(session, "Error retrieving orders");
         }
+
+
+
     }
 
 
