@@ -17,7 +17,7 @@ public class RedisOrderService {
     }
 
     public void sendOrderToPostgres(Order orderToSave) {
-        String url = "http://<Postgres-Service-IP>:8080/orders/save";  // Replace <Postgres-Service-IP> with the actual IP address or hostname
+        String url = "http://34.230.32.169:8080/hierarchy/save";  // Replace <Postgres-Service-IP> with the actual IP address or hostname
         restTemplate.postForObject(url, orderToSave, String.class);
     }
 }

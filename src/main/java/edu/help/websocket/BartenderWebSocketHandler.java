@@ -350,7 +350,11 @@ private void handleDeliverAction(WebSocketSession session, Map<String, Object> p
         }
 
         // Send the order to PostgreSQL
-        redisOrderService.sendOrderToPostgres(order);
+        restTemplate.postForObject(
+                "http://34.230.32.169:8080/hierarchy/save",
+                order,
+                OrderResponse.class
+            );
 
         // Broadcast the updated order to all bartenders
         Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
@@ -411,7 +415,11 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
         }
 
         // Send the order to PostgreSQL
-        redisOrderService.sendOrderToPostgres(order);
+        restTemplate.postForObject(
+                "http://34.230.32.169:8080/hierarchy/save",
+                order,
+                OrderResponse.class
+            );
 
         // Broadcast the updated order to all bartenders
         Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
