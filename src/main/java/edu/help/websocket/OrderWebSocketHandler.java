@@ -146,6 +146,8 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
     
         // Retrieve the session from the sessionMap using the sessionId
         WebSocketSession userSession = sessionMap.get(sessionId);
+
+
     
         // If the session is found and open, send the message
         if (userSession != null && userSession.isOpen()) {
@@ -155,6 +157,8 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
                 orderData,           // data to send
                 "Order update successful."  // message
             );
+
+            System.out.println("can you not be gay plz");
             
             // Convert the ResponseWrapper to a JSON string
             String jsonResponse = objectMapper.writeValueAsString(response);
