@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.BartenderSession;
 import edu.help.dto.Order;
+import edu.help.dto.OrderResponse;
 import edu.help.service.RedisOrderService;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -476,10 +477,9 @@ private void handleDeliverAction(WebSocketSession session, Map<String, Object> p
         }
 
         // Send the order to PostgreSQL
-        restTemplate.postForObject(
+        restTemplate.postForLocation(
                 "http://34.230.32.169:8080/hierarchy/save",
-                order,
-                OrderResponse.class
+                order
             );
 
         // Broadcast the updated order to all bartenders
@@ -541,10 +541,9 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
         }
 
         // Send the order to PostgreSQL
-        restTemplate.postForObject(
+        restTemplate.postForLocation(
                 "http://34.230.32.169:8080/hierarchy/save",
-                order,
-                OrderResponse.class
+                order
             );
 
         // Broadcast the updated order to all bartenders
