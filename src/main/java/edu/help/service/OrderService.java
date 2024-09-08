@@ -27,7 +27,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.Transaction;
-import redis.clients.jedis.json.commands.RedisJsonV1Commands;
+
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
@@ -115,7 +115,7 @@ public class OrderService {
                     sendOrderResponse(session, new ResponseWrapper(
                         "error",
                         null,
-                        "Order already in progress for barId: " + orderRequest.getBarId()
+                        "Order already in progress"
                     ));
                     return;
                 }
@@ -173,6 +173,7 @@ public class OrderService {
                 // Broadcast the new order to the bartenders
                 try {
                     BartenderWebSocketHandler.getInstance().broadcastToBar(orderRequest.getBarId(), data);
+                    System.out.println("Sent order to bartender");
                 } catch (IOException e) {
                     e.printStackTrace();
                     // Handle the exception if necessary, or log the error
@@ -334,7 +335,7 @@ public class OrderService {
             sendOrderResponse(session, new ResponseWrapper(
                 "error",
                 null,
-                "Failed to cancel the order due to a conflict. Please try again."
+                "Order has already been claimed"
             ));
             return;
         }
@@ -342,25 +343,35 @@ public class OrderService {
         System.out.println("Order status updated to 'canceled'.");
         sendOrderResponse(session, new ResponseWrapper(
             "delete",
-            null,
+            order, 
             "Order canceled successfully."
         ));
+
+// Initialize the data map for broadcasting
+Map<String, Object> data = new HashMap<>();
+data.put("orders", order);  // Use the updated order object
+
+// Broadcast the updated order to the bartenders
+try {
+    BartenderWebSocketHandler.getInstance().broadcastToBar(barId, data);
+    System.out.println("Broadcasted order cancellation to bar " + barId);
+} catch (IOException e) {
+    e.printStackTrace();
+    System.err.println("Error broadcasting order cancellation to bartenders.");
+}
+
     } catch (Exception e) {
         System.err.println("Error processing order: " + e.getMessage());
         e.printStackTrace();
         sendOrderResponse(session, new ResponseWrapper(
-            "error",
-            null,
-            "Error occurred while processing the order."
-        ));
+                "error",
+                null,
+                "Error occurred while processing the order."));
     }
 }
 
 
 
-
-
-    
     public void refreshOrdersForUser(int userId, WebSocketSession session) {
         ScanParams scanParams = new ScanParams().match("*." + userId);
         String cursor = "0";

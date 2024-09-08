@@ -1,7 +1,6 @@
 package edu.help.websocket;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -98,7 +97,7 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
                     break;
             }
 
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             e.printStackTrace();
             session.sendMessage(new TextMessage("Error: " + e.getMessage()));
         }
@@ -138,10 +137,6 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
     }
 
     public void updateUser(Map<String, Object> orderData) throws IOException {
-        // Extract relevant information from the order data
-        int barId = (int) orderData.get("barId");
-        String status = (String) orderData.get("status");
-        String claimer = (String) orderData.get("claimer");
         String sessionId = (String) orderData.get("sessionId");
     
         // Retrieve the session from the sessionMap using the sessionId
@@ -158,7 +153,6 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
                 "Order update successful."  // message
             );
 
-            System.out.println("can you not be gay plz");
             
             // Convert the ResponseWrapper to a JSON string
             String jsonResponse = objectMapper.writeValueAsString(response);
