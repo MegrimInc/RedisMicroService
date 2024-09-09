@@ -2,6 +2,7 @@ package edu.help.service;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -168,7 +169,8 @@ public class OrderService {
     
                 // Initialize the data map for broadcasting
                 Map<String, Object> data = new HashMap<>();
-                data.put("orders", order);
+                //data.put("orders", order);
+                data.put("orders", Collections.singletonList(order));
     
                 // Broadcast the new order to the bartenders
                 try {
@@ -349,7 +351,8 @@ public class OrderService {
 
 // Initialize the data map for broadcasting
 Map<String, Object> data = new HashMap<>();
-data.put("orders", order);  // Use the updated order object
+//data.put("orders", order); // Use the updated order object
+data.put("orders", Collections.singletonList(order));
 
 // Broadcast the updated order to the bartenders
 try {
