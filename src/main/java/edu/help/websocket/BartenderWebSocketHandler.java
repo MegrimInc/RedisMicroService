@@ -985,30 +985,82 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
 
 
 
+    // public void broadcastToBar(int barID, Map<String, Object> data) throws IOException {
+    //     // Prepare the data to be broadcasted
+    //     String message = objectMapper.writeValueAsString(data);
+
+    //     // Debug: Print the message that is being broadcasted
+    //     System.out.println("Broadcasting message to bar " + barID + ": " + message);
+
+    //     // Iterate over all connected sessions and send the message
+    //     for (Map.Entry<String, WebSocketSession> entry : sessionMap.entrySet()) {
+    //         String sessionID = entry.getKey();
+    //         WebSocketSession wsSession = entry.getValue();
+
+    //         // Debug: Print the session ID and check if the session is open
+    //         System.out.println("Checking session ID: " + sessionID + " (isOpen: " + wsSession.isOpen() + ")");
+
+    //         if (wsSession.isOpen()) {
+    //             // Debug: Print the message before sending it
+    //             System.out.println("Sending message to session ID: " + sessionID);
+    //             wsSession.sendMessage(new TextMessage(message));
+    //         } else {
+    //             // Debug: If session is not open, log it
+    //             System.out.println("Session ID: " + sessionID + " is not open. Skipping.");
+    //         }
+    //     }
+    // }
+
+
     public void broadcastToBar(int barID, Map<String, Object> data) throws IOException {
         // Prepare the data to be broadcasted
         String message = objectMapper.writeValueAsString(data);
-        
+    
         // Debug: Print the message that is being broadcasted
         System.out.println("Broadcasting message to bar " + barID + ": " + message);
     
-        // Iterate over all connected sessions and send the message
+        // Step 1: Scan Redis for keys matching the format barId.AlphabeticLetter
+        String pattern = barID + ".[a-zA-Z]*";
+        List<String> matchingSessionIds = new ArrayList<>();
+    
+        try (Jedis jedis = jedisPool.getResource()) {
+            ScanParams scanParams = new ScanParams().match(pattern);
+            String cursor = "0";
+    
+            do {
+                ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
+                cursor = scanResult.getCursor();
+    
+                for (String key : scanResult.getResult()) {
+                    // Step 2: Retrieve the BartenderSession object from Redis
+                    BartenderSession bartenderSession = jedisPooled.jsonGet(key, BartenderSession.class);
+    
+                    if (bartenderSession != null && bartenderSession.getActive()) {
+                        matchingSessionIds.add(bartenderSession.getSessionId());
+                    }
+                }
+            } while (!"0".equals(cursor));
+        }
+    
+        // Debug: Print the matching session IDs
+        System.out.println("Matching session IDs for bar " + barID + ": " + matchingSessionIds);
+    
+        // Step 3: Filter the sessionMap to find open sessions that match the retrieved sessionIds
         for (Map.Entry<String, WebSocketSession> entry : sessionMap.entrySet()) {
             String sessionID = entry.getKey();
             WebSocketSession wsSession = entry.getValue();
     
-            // Debug: Print the session ID and check if the session is open
-            System.out.println("Checking session ID: " + sessionID + " (isOpen: " + wsSession.isOpen() + ")");
-    
-            if (wsSession.isOpen()) {
-                // Debug: Print the message before sending it
+            if (matchingSessionIds.contains(sessionID) && wsSession.isOpen()) {
+                // Debug: Print the session ID before sending the message
                 System.out.println("Sending message to session ID: " + sessionID);
                 wsSession.sendMessage(new TextMessage(message));
             } else {
-                // Debug: If session is not open, log it
-                System.out.println("Session ID: " + sessionID + " is not open. Skipping.");
+                // Debug: If session is not open or does not match, log it
+                System.out.println("Session ID: " + sessionID + " is not open or does not match. Skipping.");
             }
         }
     }
+    
+   
 
 }
