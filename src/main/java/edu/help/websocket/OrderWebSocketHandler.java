@@ -1,20 +1,36 @@
 package edu.help.websocket;
 
+import java.io.File;
 import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.net.ssl.SSLException;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import com.eatthepath.pushy.apns.ApnsClient;
+import com.eatthepath.pushy.apns.ApnsClientBuilder;
+import com.eatthepath.pushy.apns.PushNotificationResponse;
+import com.eatthepath.pushy.apns.auth.ApnsSigningKey;
+import com.eatthepath.pushy.apns.util.SimpleApnsPayloadBuilder;
+import com.eatthepath.pushy.apns.util.SimpleApnsPushNotification;
+import com.eatthepath.pushy.apns.util.TokenUtil;
+import com.eatthepath.pushy.apns.util.concurrent.PushNotificationFuture;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.OrderRequest;
 import edu.help.dto.ResponseWrapper;
 import edu.help.service.OrderService;
+
+
 
 @Component
 public class OrderWebSocketHandler extends TextWebSocketHandler {
@@ -22,13 +38,34 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     private final OrderService orderService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
+    private final Map<String, String> deviceTokenMap = new ConcurrentHashMap<>();
+    private final ApnsClient apnsClient;
     
 
-
-
-   
-    public OrderWebSocketHandler(OrderService orderService ) {
+    public OrderWebSocketHandler(OrderService orderService ) throws InvalidKeyException, SSLException, NoSuchAlgorithmException, IOException {
         this.orderService = orderService;
+
+        // this.apnsClient = new ApnsClientBuilder()
+        // .setApnsServer(ApnsClientBuilder.PRODUCTION_APNS_HOST) // Use `PRODUCTION_APNS_HOST` for development
+        // .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
+        //     new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file
+        //         "6TK33N3VRX",
+        //          "4TSCNPNRJC" 
+        // ))
+        //         .build();
+
+        
+    this.apnsClient = new ApnsClientBuilder()
+    .setApnsServer(ApnsClientBuilder.DEVELOPMENT_APNS_HOST) // Use `DEVELOPMENT_APNS_HOST` for debugging
+    .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
+        new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file     
+            "6TK33N3VRX",
+            "4TSCNPNRJC" 
+    ))
+    .build();
+        
+    // Configure ObjectMapper to ignore unknown fields
+    objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
        
     }
 
@@ -63,7 +100,7 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
 
             String action = (String) payloadMap.get("action");
             payloadMap.remove("action");
-            //OrderRequest orderRequest = objectMapper.convertValue(payloadMap.get("orderRequest"), OrderRequest.class);
+            
 
             OrderRequest orderRequest = objectMapper.convertValue(payloadMap, new TypeReference<OrderRequest>() {});
 
@@ -87,8 +124,9 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
                     
                     break;
                 case "refresh":
-
-                int userIdToRefresh = (int) payloadMap.get("userId");
+                    int userIdToRefresh = (int) payloadMap.get("userId");
+                    String deviceToken = (String) payloadMap.get("deviceToken");
+                    updateDeviceToken(userIdToRefresh, deviceToken);
                     orderService.refreshOrdersForUser(userIdToRefresh, session);
                    
                     break;
@@ -137,30 +175,115 @@ public void afterConnectionEstablished(WebSocketSession session) throws Exceptio
     }
 
     public void updateUser(Map<String, Object> orderData) throws IOException {
+        String status = (String) orderData.get("status");  // Extract status from orderData
+        String claimer = (String) orderData.get("claimer");  // Extract claimer, default to empty string
         String sessionId = (String) orderData.get("sessionId");
-    
+        int userId = (int) orderData.get("userId");
+        String deviceToken = deviceTokenMap.get(String.valueOf(userId));
+
         // Retrieve the session from the sessionMap using the sessionId
         WebSocketSession userSession = sessionMap.get(sessionId);
 
-
-    
         // If the session is found and open, send the message
         if (userSession != null && userSession.isOpen()) {
             // Create a ResponseWrapper with the update information
             ResponseWrapper response = new ResponseWrapper(
-                "update",            // messageType
-                orderData,           // data to send
-                "Order update successful."  // message
+                    "update", // messageType
+                    orderData, // data to send
+                    "Order update successful." // message
             );
 
-            
             // Convert the ResponseWrapper to a JSON string
             String jsonResponse = objectMapper.writeValueAsString(response);
-            
+
             // Send the response to the user
             userSession.sendMessage(new TextMessage(jsonResponse));
         } else {
             System.err.println("User session not found or closed: " + sessionId);
         }
+
+       // Check if the deviceToken is not null and not empty
+    if (deviceToken != null && !deviceToken.isEmpty()) {
+        // Construct the notification message based on the order status and claimer
+        String notificationMessage;
+        switch (status.toLowerCase()) {
+            case "unready":
+                notificationMessage = claimer.isEmpty()
+                        ? "Your order has been unclaimed."
+                        : "Station \"" + claimer + "\" has claimed your order!";
+                break;
+            case "ready":
+                notificationMessage = "Your order is now ready at station \"" + claimer + "\".";
+                break;
+            case "delivered":
+                notificationMessage = "Station \"" + claimer + "\" has delivered your order.";
+                break;
+            case "canceled":
+                notificationMessage = "Station \"" + claimer + "\" has canceled your order.";
+                break;
+            default:
+                System.err.println("Unknown order status: " + status);
+                return;  // Exit early if status is not recognized
+        }
+
+        // Send the push notification with the constructed message
+        System.out.println("Sending push notification: " + notificationMessage);
+        sendPushNotification(deviceToken, notificationMessage);
+    } else {
+        System.err.println("No device token found for userId: " + userId + ", unable to send push notification.");
     }
+
+
+    }
+    
+    // Method to update the deviceTokenMap from OrderService
+    public void updateDeviceToken(int userId, String deviceToken) {
+        String userIdStr = String.valueOf(userId);
+        deviceTokenMap.put(userIdStr, deviceToken);
+        System.out.println("Device token for userId " + userId + " has been stored/updated.");
+    }
+
+
+// Corrected sendPushNotification method
+public void sendPushNotification(String deviceToken, String alertMessage) {
+    try {
+        // Use the correct payload builder
+        SimpleApnsPayloadBuilder payloadBuilder = new SimpleApnsPayloadBuilder();
+        payloadBuilder.setAlertBody(alertMessage);
+        String payload = payloadBuilder.build();
+
+        // Sanitize the device token (removes spaces and special characters)
+        String sanitizedToken = TokenUtil.sanitizeTokenString(deviceToken);
+
+        // Create the push notification
+        SimpleApnsPushNotification pushNotification = new SimpleApnsPushNotification(
+                sanitizedToken,
+                "com.example.barzzyApp9", // Replace with your app's bundle ID
+                payload
+        );
+
+        // Use PushNotificationFuture for handling notification responses
+        PushNotificationFuture<SimpleApnsPushNotification, PushNotificationResponse<SimpleApnsPushNotification>> sendNotificationFuture =
+                this.apnsClient.sendNotification(pushNotification);
+
+        // Handle response asynchronously
+        sendNotificationFuture.whenComplete((response, cause) -> {
+            if (response != null) {
+                if (response.isAccepted()) {
+                    System.out.println("Push notification accepted by APNs gateway.");
+                } else {
+                    System.out.println("Notification rejected by the APNs gateway: " +
+                            response.getRejectionReason());
+                }
+            } else {
+                System.err.println("Failed to send push notification.");
+                cause.printStackTrace();
+            }
+        });
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        System.err.println("Error sending push notification: " + e.getMessage());
+    }
+}
 }

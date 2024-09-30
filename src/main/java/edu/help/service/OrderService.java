@@ -374,7 +374,6 @@ try {
 }
 
 
-
     public void refreshOrdersForUser(int userId, WebSocketSession session) {
         ScanParams scanParams = new ScanParams().match("*." + userId);
         String cursor = "0";
