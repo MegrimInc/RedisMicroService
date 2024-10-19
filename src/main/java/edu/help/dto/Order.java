@@ -13,9 +13,11 @@ public class Order {
     private String claimer;
     private String timestamp;
     private String sessionId;
+    private boolean points;
+
 
     public Order(int barId, int userId, double price, List<DrinkOrder> drinks, String status, String claimer,
-            String timestamp, String sessionId) {
+            String timestamp, String sessionId, boolean points) {
         this.barId = barId;
         this.userId = userId;
         this.price = price;
@@ -24,6 +26,7 @@ public class Order {
         this.claimer = claimer;
         this.timestamp = timestamp;
         this.sessionId = sessionId;
+        this.points = points;
     }
     
     public Order() {
@@ -40,6 +43,7 @@ public String toString() {
             ", claimer='" + claimer + '\'' +
             ", timestamp='" + timestamp + '\'' +
             ", sessionId='" + sessionId + '\'' +
+            ", points='" + points + 
             '}';
 }
 
@@ -123,6 +127,16 @@ public String toString() {
     @JsonProperty("sessionId")
     public void setSessionId(String sessionId) {
         this.sessionId = sessionId;
+    }
+
+    @JsonProperty("points")
+    public boolean isPoints() {  // New getter
+        return points;
+    }
+
+    @JsonProperty("points")
+    public void setPoints(boolean points) {  // New setter
+        this.points = points;
     }
 
     public static class DrinkOrder {

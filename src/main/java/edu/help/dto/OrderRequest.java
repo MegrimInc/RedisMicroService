@@ -7,6 +7,7 @@ public class OrderRequest {
     private int barId;
     private int userId;
     private Boolean isHappyHour;
+    private boolean points;
     private List<DrinkOrder> drinks;
 
     @Override
@@ -15,6 +16,7 @@ public String toString() {
             "barId=" + barId +
             ", userId=" + userId +
             ", happyHour=" + isHappyHour +
+            ", points=" + points +
             ", drinks=" + drinks +
             '}';
 }
@@ -52,6 +54,14 @@ public String toString() {
     public boolean getIsHappyHour()
     {
         return isHappyHour;
+    }
+
+    public boolean isPoints() {  // New getter
+        return points;
+    }
+
+    public void setPoints(boolean points) {  // New setter
+        this.points = points;
     }
 
     public static class DrinkOrder {

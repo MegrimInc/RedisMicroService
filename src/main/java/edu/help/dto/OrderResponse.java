@@ -13,7 +13,7 @@ public class OrderResponse {
         // Default constructor
     }
 
-    // Constructor with messageType
+    // Constructor
     public OrderResponse(String message, double totalPrice, List<DrinkOrder> drinks, String messageType) {
         this.message = message;
         this.totalPrice = totalPrice;

@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -37,10 +38,9 @@ public class OrderService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
- 
+
     private final JedisPooled jedisPooled; // Redis client for simple operations
     private final JedisPool jedisPool; // Redis connection pool for transactions
-    
 
     public OrderService(RestTemplate restTemplate, JedisPooled jedisPooled, JedisPool jedisPool) {
         this.restTemplate = restTemplate;
@@ -50,32 +50,31 @@ public class OrderService {
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
-    
+
         // Fetch open and happyHour status from Redis
         String barKey = String.valueOf(orderRequest.getBarId());
         Boolean isOpen = Boolean.valueOf(jedisPooled.hget(barKey, "open"));
         Boolean isHappyHour = Boolean.valueOf(jedisPooled.hget(barKey, "happyHour"));
-    
+
         // Check if the bar is open
         if (isOpen == null || !isOpen) {
             sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,  // No data, as the bar is closed
-                "Failed to process order: The bar is currently closed."
-            ));
+                    "error",
+                    null, // No data, as the bar is closed
+                    "Failed to process order: The bar is currently closed."));
             return;
         }
-    
+
         String orderKey = generateOrderKey(orderRequest);
         System.out.println("Generated order key: " + orderKey);
-        
+
         if (jedisPooled.exists(orderKey)) {
             System.out.println("Order key exists in Redis: " + orderKey);
-            
+
             // Retrieve the JSON object as a raw object
             Object orderJsonObj = jedisPooled.jsonGet(orderKey);
             System.out.println("Raw JSON object retrieved: " + orderJsonObj);
-        
+
             if (orderJsonObj != null) {
                 // Convert the JSON object to a string
                 String orderJson;
@@ -85,13 +84,12 @@ public class OrderService {
                 } catch (JsonProcessingException e) {
                     System.err.println("Failed to serialize existing order data: " + e.getMessage());
                     sendOrderResponse(session, new ResponseWrapper(
-                        "error",
-                        null,
-                        "Failed to process existing order data."
-                    ));
+                            "error",
+                            null,
+                            "Failed to process existing order data."));
                     return;
                 }
-        
+
                 // Deserialize the string back into an Order object
                 Order existingOrder;
                 try {
@@ -100,103 +98,105 @@ public class OrderService {
                 } catch (JsonProcessingException e) {
                     System.err.println("Failed to deserialize existing order data: " + e.getMessage());
                     sendOrderResponse(session, new ResponseWrapper(
-                        "error",
-                        null,
-                        "Failed to process existing order data."
-                    ));
+                            "error",
+                            null,
+                            "Failed to process existing order data."));
                     return;
                 }
-        
+
                 // Check the status of the existing order
                 String existingStatus = existingOrder.getStatus();
                 System.out.println("Existing order status: " + existingStatus);
-        
+
                 if (!"delivered".equals(existingStatus) && !"canceled".equals(existingStatus)) {
                     System.out.println("Order already in progress, status: " + existingStatus);
                     sendOrderResponse(session, new ResponseWrapper(
-                        "error",
-                        null,
-                        "Order already in progress"
-                    ));
+                            "error",
+                            null,
+                            "Order already in progress"));
                     return;
                 }
             }
         }
-        
-        System.out.println("No existing order in progress or status is 'delivered' or 'canceled'. Proceeding with order processing.");
-    
+
+        System.out.println(
+                "No existing order in progress or status is 'delivered' or 'canceled'. Proceeding with order processing.");
+
         // Set the happy hour status in the OrderRequest
         if (isHappyHour != null) {
             orderRequest.setIsHappyHour(isHappyHour);
         } else {
             sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,  // No data, as happy hour status is missing
-                "Failed to retrieve happy hour status."
-            ));
+                    "error",
+                    null, // No data, as happy hour status is missing
+                    "Failed to retrieve happy hour status."));
             return;
         }
-    
+
+        ////RIGHT HERE IS WHERE WE WILL BE WORKING CHIDE 
+
         try {
-            // Send order request to PostgreSQL (already containing the happy hour status)
+            // Send order request to PostgreSQL
             OrderResponse orderResponse = restTemplate.postForObject(
-                "http://34.230.32.169:8080/" + orderRequest.getBarId() + "/processOrder",
-                orderRequest,
-                OrderResponse.class
-            );
-    
+                    "http://34.230.32.169:8080/" + orderRequest.getBarId() + "/processOrder",
+                    orderRequest,
+                    OrderResponse.class);
+
             if (orderResponse != null) {
-                // Create Order object and store it in Redis
+                // Create and store the order in Redis
                 Order order = new Order(
-                    orderRequest.getBarId(),
-                    orderRequest.getUserId(),
-                    orderResponse.getTotalPrice(),
-                    convertDrinksToOrders(orderResponse.getDrinks()),
-                    "unready",
-                    "",
-                    getCurrentTimestamp(),
-                    session.getId() 
-                );
-    
-                jedisPooled.jsonSetWithEscape(orderKey, order);
-                System.out.println("Stored order in Redis with key: " + orderKey);
-    
-                sendOrderResponse(session, new ResponseWrapper(
-                    "create",
-                    order,  // Send the actual order data
-                    "Order successfully processed."
-                ));
-    
-                // Initialize the data map for broadcasting
-                Map<String, Object> data = new HashMap<>();
-                //data.put("orders", order);
-                data.put("orders", Collections.singletonList(order));
-    
-                // Broadcast the new order to the bartenders
-                try {
-                    BartenderWebSocketHandler.getInstance().broadcastToBar(orderRequest.getBarId(), data);
-                    System.out.println("Sent order to bartender");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    // Handle the exception if necessary, or log the error
+                        orderRequest.getBarId(),
+                        orderRequest.getUserId(),
+                        orderResponse.getTotalPrice(),
+                        convertDrinksToOrders(orderResponse.getDrinks()),
+                        "unready",
+                        "",
+                        getCurrentTimestamp(),
+                        session.getId(),
+                        orderRequest.isPoints());
+
+                if (!"broke".equals(orderResponse.getMessageType())) {
+
+                    jedisPooled.jsonSetWithEscape(orderKey, order);
+                    System.out.println("Stored order in Redis with key: " + orderKey);
+
+                    sendOrderResponse(session, new ResponseWrapper(
+                            "create",
+                            order,
+                            "Order successfully processed."));
+
+                    // Broadcast the order to bartenders
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("orders", Collections.singletonList(order));
+                    try {
+                        BartenderWebSocketHandler.getInstance().broadcastToBar(orderRequest.getBarId(), data);
+                        System.out.println("Sent order to bartender");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    // Handle insufficient points or other errors
+                    System.out.println("Order failed: " + orderResponse.getMessage());
+                    sendOrderResponse(session, new ResponseWrapper(
+                            "broke",
+                            order,
+                            orderResponse.getMessage()));
                 }
             }
-    
+
         } catch (RestClientException e) {
             e.printStackTrace();
             sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,  // No data, as an exception occurred
-                "Failed to process order: No response from PostgreSQL."
-            ));
-        } 
+                    "error",
+                    null,
+                    "Sorry, it looks like our servers are down. Check back later!"));
+        }
     }
-    
 
     private List<Order.DrinkOrder> convertDrinksToOrders(List<OrderResponse.DrinkOrder> drinkResponses) {
         return drinkResponses.stream()
-                             .map(drink -> new Order.DrinkOrder(drink.getDrinkId(), drink.getDrinkName(), drink.getQuantity()))
-                             .toList();
+                .map(drink -> new Order.DrinkOrder(drink.getDrinkId(), drink.getDrinkName(), drink.getQuantity()))
+                .toList();
     }
 
     private String generateOrderKey(OrderRequest orderRequest) {
@@ -212,14 +212,12 @@ public class OrderService {
         }
     }
 
-
     private void sendErrorResponse(WebSocketSession session, String message) {
         try {
             ResponseWrapper responseWrapper = new ResponseWrapper(
-                "error",
-                null,
-                message
-            );
+                    "error",
+                    null,
+                    message);
             sendOrderResponse(session, responseWrapper);
             if (session.isOpen()) {
                 session.close();
@@ -230,149 +228,179 @@ public class OrderService {
         }
     }
 
-
     private String getCurrentTimestamp() {
         return String.valueOf(System.currentTimeMillis());
     }
 
-   
-    public void cancelOrderIfUnclaimed(int barId, int userId, WebSocketSession session) {
-    String key = String.format("%d.%d", barId, userId);
-    System.out.println("Attempting to cancel order for key: " + key);
+    public void cancelOrderIfUnclaimed(OrderRequest orderRequest, WebSocketSession session) {
 
-    try (Jedis jedis = jedisPool.getResource()) {
-        System.out.println("Obtained Jedis instance from the pool.");
-        jedis.watch(key);
-        System.out.println("Watching key: " + key);
+        Boolean isHappyHour = Boolean.valueOf(jedisPooled.hget(barKey, "happyHour"));
+        // Extract barId and userId from the OrderRequest
+        int barId = orderRequest.getBarId();
+        int userId = orderRequest.getUserId();
 
-        // Retrieve the JSON object as a raw object
-        Object orderJsonObj = jedisPooled.jsonGet(key);
+        String key = String.format("%d.%d", barId, userId);
+        System.out.println("Attempting to cancel order for key: " + key);
 
-        if (orderJsonObj == null) {
-            System.out.println("Key does not exist, unwatching.");
-            jedis.unwatch();
+        try (Jedis jedis = jedisPool.getResource()) {
+            System.out.println("Obtained Jedis instance from the pool.");
+            jedis.watch(key);
+            System.out.println("Watching key: " + key);
+
+            // Retrieve the JSON object as a raw object
+            Object orderJsonObj = jedisPooled.jsonGet(key);
+
+            if (orderJsonObj == null) {
+                System.out.println("Key does not exist, unwatching.");
+                jedis.unwatch();
+                sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Order does not exist."));
+                return;
+            }
+
+            // Convert the JSON object to a string
+            String orderJson;
+            try {
+                orderJson = objectMapper.writeValueAsString(orderJsonObj);
+            } catch (JsonProcessingException e) {
+                sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Failed to process order data."));
+                jedis.unwatch(); // Unwatch if processing fails
+                return;
+            }
+
+            // Deserialize the string back into an Order object
+            Order order;
+            try {
+                order = objectMapper.readValue(orderJson, Order.class);
+            } catch (JsonProcessingException e) {
+                sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Failed to process order data."));
+                jedis.unwatch(); // Unwatch if processing fails
+                return;
+            }
+
+            // Check the claimer field in the Order object
+            String claimer = order.getClaimer();
+            System.out.println("Claimer field value: " + claimer);
+
+            if (!claimer.isEmpty()) {
+                System.out.println("Order has a claimer; no action taken. Unwatching key.");
+                jedis.unwatch();
+                sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Order can no longer be canceled."));
+                return;
+            }
+
+            System.out.println("Claimer is empty, proceeding with transaction.");
+            Transaction transaction = jedis.multi();
+            System.out.println("Transaction started.");
+
+            // Update the status to "canceled"
+            order.setStatus("canceled");
+            order.setClaimer(String.valueOf(userId));
+            System.out.println("Order status set to canceled.");
+
+            // Serialize the updated order back to JSON
+            String updatedOrderJson;
+            try {
+                updatedOrderJson = objectMapper.writeValueAsString(order);
+            } catch (JsonProcessingException e) {
+                sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Failed to serialize updated order data."));
+                jedis.unwatch(); // Unwatch if processing fails
+                return;
+            }
+
+
+            //////HERE PLZ CHAT GPT THIS IS RIGHT AFTER REDIS CONFIRMS THE ORDER ISNT IN PROGRESS BUT BEFORE IT SET ANYTHING 
+            try {
+                OrderResponse refundResponse = restTemplate.postForObject(
+                    "http://34.230.32.169:8080/" + barId + "/refundOrder",
+                    orderRequest,
+                    OrderResponse.class
+                );
+    
+                if (refundResponse == null) {
+                    System.out.println("Refund API request failed.");
+                    sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Refund failed. Please try again."
+                    ));
+                    jedis.unwatch();
+                    return;
+                }
+    
+                System.out.println("Refund API call successful.");
+    
+            } catch (RestClientException e) {
+                e.printStackTrace();
+                sendOrderResponse(session, new ResponseWrapper(
+                    "error",
+                    null,
+                    "Refund service unavailable. Please try again later."
+                ));
+                jedis.unwatch();
+                return;
+            }
+            
+
+            // Set the updated JSON string back into Redis
+            transaction.jsonSet(key, updatedOrderJson);
+            System.out.println("Updated Order set back to Redis.");
+
+            List<Object> results = transaction.exec();
+            System.out.println("Transaction executed. Results: " + results);
+
+            if (results == null || results.isEmpty()) {
+                System.out.println("Failed to update the order status due to a conflict. Please try again.");
+                sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Order has already been claimed"));
+                return;
+            }
+
+            System.out.println("Order status updated to 'canceled'.");
             sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,
-                "Order does not exist."
-            ));
-            return;
-        }
+                    "delete",
+                    order,
+                    "Order canceled successfully."));
 
-        // Convert the JSON object to a string
-        String orderJson;
-        try {
-            orderJson = objectMapper.writeValueAsString(orderJsonObj);
-        } catch (JsonProcessingException e) {
+            // Initialize the data map for broadcasting
+            Map<String, Object> data = new HashMap<>();
+            //data.put("orders", order); // Use the updated order object
+            data.put("orders", Collections.singletonList(order));
+
+            // Broadcast the updated order to the bartenders
+            try {
+                BartenderWebSocketHandler.getInstance().broadcastToBar(barId, data);
+                System.out.println("Broadcasted order cancellation to bar " + barId);
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.err.println("Error broadcasting order cancellation to bartenders.");
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error processing order: " + e.getMessage());
+            e.printStackTrace();
             sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,
-                "Failed to process order data."
-            ));
-            jedis.unwatch(); // Unwatch if processing fails
-            return;
+                    "error",
+                    null,
+                    "Error occurred while processing the order."));
         }
-
-        // Deserialize the string back into an Order object
-        Order order;
-        try {
-            order = objectMapper.readValue(orderJson, Order.class);
-        } catch (JsonProcessingException e) {
-            sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,
-                "Failed to process order data."
-            ));
-            jedis.unwatch(); // Unwatch if processing fails
-            return;
-        }
-
-        // Check the claimer field in the Order object
-        String claimer = order.getClaimer();
-        System.out.println("Claimer field value: " + claimer);
-
-        if (!claimer.isEmpty()) {
-            System.out.println("Order has a claimer; no action taken. Unwatching key.");
-            jedis.unwatch();
-            sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,
-                "Order can no longer be canceled."
-            ));
-            return;
-        }
-
-        System.out.println("Claimer is empty, proceeding with transaction.");
-        Transaction transaction = jedis.multi();
-        System.out.println("Transaction started.");
-
-        // Update the status to "canceled"
-        order.setStatus("canceled");
-        order.setClaimer(String.valueOf(userId));
-        System.out.println("Order status set to canceled.");
-
-        // Serialize the updated order back to JSON
-        String updatedOrderJson;
-        try {
-            updatedOrderJson = objectMapper.writeValueAsString(order);
-        } catch (JsonProcessingException e) {
-            sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,
-                "Failed to serialize updated order data."
-            ));
-            jedis.unwatch(); // Unwatch if processing fails
-            return;
-        }
-
-        // Set the updated JSON string back into Redis
-        transaction.jsonSet(key, updatedOrderJson);
-        System.out.println("Updated Order set back to Redis.");
-
-        List<Object> results = transaction.exec();
-        System.out.println("Transaction executed. Results: " + results);
-
-        if (results == null || results.isEmpty()) {
-            System.out.println("Failed to update the order status due to a conflict. Please try again.");
-            sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,
-                "Order has already been claimed"
-            ));
-            return;
-        }
-
-        System.out.println("Order status updated to 'canceled'.");
-        sendOrderResponse(session, new ResponseWrapper(
-            "delete",
-            order, 
-            "Order canceled successfully."
-        ));
-
-// Initialize the data map for broadcasting
-Map<String, Object> data = new HashMap<>();
-//data.put("orders", order); // Use the updated order object
-data.put("orders", Collections.singletonList(order));
-
-// Broadcast the updated order to the bartenders
-try {
-    BartenderWebSocketHandler.getInstance().broadcastToBar(barId, data);
-    System.out.println("Broadcasted order cancellation to bar " + barId);
-} catch (IOException e) {
-    e.printStackTrace();
-    System.err.println("Error broadcasting order cancellation to bartenders.");
-}
-
-    } catch (Exception e) {
-        System.err.println("Error processing order: " + e.getMessage());
-        e.printStackTrace();
-        sendOrderResponse(session, new ResponseWrapper(
-                "error",
-                null,
-                "Error occurred while processing the order."));
     }
-}
-
 
     public void refreshOrdersForUser(int userId, WebSocketSession session) {
         ScanParams scanParams = new ScanParams().match("*." + userId);
@@ -438,6 +466,5 @@ try {
             sendErrorResponse(session, "Failed to retrieve orders.");
         }
     }
-    
-   
+
 }
