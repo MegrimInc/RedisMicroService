@@ -6,6 +6,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
 import javax.net.ssl.SSLException;
 
 import org.springframework.stereotype.Component;
@@ -34,37 +35,45 @@ import edu.help.service.OrderService;
 @Component
 public class OrderWebSocketHandler extends TextWebSocketHandler {
 
+    private static OrderWebSocketHandler instance;
+
     private final OrderService orderService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
     private final Map<String, String> deviceTokenMap = new ConcurrentHashMap<>();
     private final ApnsClient apnsClient;
-
+   
 
     public OrderWebSocketHandler(OrderService orderService)
             throws InvalidKeyException, SSLException, NoSuchAlgorithmException, IOException {
         this.orderService = orderService;
 
+        // this.apnsClient = new ApnsClientBuilder()
+        //         .setApnsServer(ApnsClientBuilder.PRODUCTION_APNS_HOST) // Use `PRODUCTION_APNS_HOST` for development
+        //         .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
+        //                 new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file
+        //                 "6TK33N3VRX",
+        //                 "4TSCNPNRJC"))
+        //         .build();
+
         this.apnsClient = new ApnsClientBuilder()
-                .setApnsServer(ApnsClientBuilder.PRODUCTION_APNS_HOST) // Use `PRODUCTION_APNS_HOST` for development
+                .setApnsServer(ApnsClientBuilder.DEVELOPMENT_APNS_HOST) // Use `DEVELOPMENT_APNS_HOST` for debugging
                 .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
-                        new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file
+                        new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file     
                         "6TK33N3VRX",
                         "4TSCNPNRJC"))
                 .build();
 
-        // this.apnsClient = new ApnsClientBuilder()
-        // .setApnsServer(ApnsClientBuilder.DEVELOPMENT_APNS_HOST) // Use `DEVELOPMENT_APNS_HOST` for debugging
-        // .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
-        //     new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file     
-        //         "6TK33N3VRX",
-        //         "4TSCNPNRJC" 
-        // ))
-        // .build();
-
         // Configure ObjectMapper to ignore unknown fields
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
+        instance = this;
+
+    }
+
+    // Getter for the singleton instance
+    public static OrderWebSocketHandler getInstance() {
+        return instance;
     }
 
     //Method to handle a successful connection
@@ -119,7 +128,8 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                     break;
                 case "delete":
                     if (orderRequest != null) {
-                        orderService.cancelOrderIfUnclaimed(orderRequest, session);  // Pass full OrderRequest
+                        orderService.cancelOrderIfUnclaimed(orderRequest, session); // Pass full OrderRequest
+                        
                     } else {
                     sendErrorResponse(session, "Invalid order format.");
                     }
@@ -284,5 +294,35 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             e.printStackTrace();
             System.err.println("Error sending push notification: " + e.getMessage());
         }
+    }
+
+    public void sendCreateNotification(OrderRequest orderRequest) {
+        // Calculate total quantity for points
+        int totalQuantity = orderRequest.getDrinks().stream()
+                .mapToInt(OrderRequest.DrinkOrder::getQuantity)
+                .sum();
+        String message = "Order placed! " + (totalQuantity * 75) + 
+                         " pts have been awarded to your account!";
+    
+        // Retrieve device token
+        String deviceToken = deviceTokenMap.get(String.valueOf(orderRequest.getUserId()));
+        if (deviceToken != null && !deviceToken.isEmpty()) {
+            sendPushNotification(deviceToken, message);
+        } else {
+            System.err.println("No device token found for userId: " + orderRequest.getUserId());
+        }
+    }
+    
+    public void sendCancelNotification(OrderRequest orderRequest) {
+            String message = "Order canceled. All points have been refunded";
+    
+            // Retrieve device token
+            String deviceToken = deviceTokenMap.get(String.valueOf(orderRequest.getUserId()));
+            if (deviceToken != null && !deviceToken.isEmpty()) {
+                sendPushNotification(deviceToken, message);
+            } else {
+                System.err.println("No device token found for userId: " + orderRequest.getUserId());
+            }
+        
     }
 }

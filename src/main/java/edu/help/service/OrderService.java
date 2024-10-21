@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.http.ResponseEntity;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -19,16 +19,17 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
 import edu.help.dto.Order;
 import edu.help.dto.OrderRequest;
 import edu.help.dto.OrderResponse;
 import edu.help.dto.ResponseWrapper;
 import edu.help.websocket.BartenderWebSocketHandler;
+import edu.help.websocket.OrderWebSocketHandler;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.Transaction;
+
 
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -38,7 +39,6 @@ public class OrderService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
     private final JedisPooled jedisPooled; // Redis client for simple operations
     private final JedisPool jedisPool; // Redis connection pool for transactions
 
@@ -46,6 +46,7 @@ public class OrderService {
         this.restTemplate = restTemplate;
         this.jedisPooled = jedisPooled;
         this.jedisPool = jedisPool;
+        
     }
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
@@ -164,6 +165,8 @@ public class OrderService {
                             "create",
                             order,
                             "Order successfully processed."));
+                            
+                    OrderWebSocketHandler.getInstance().sendCreateNotification(orderRequest);
 
                     // Broadcast the order to bartenders
                     Map<String, Object> data = new HashMap<>();
@@ -233,8 +236,6 @@ public class OrderService {
     }
 
     public void cancelOrderIfUnclaimed(OrderRequest orderRequest, WebSocketSession session) {
-
-        Boolean isHappyHour = Boolean.valueOf(jedisPooled.hget(barKey, "happyHour"));
         // Extract barId and userId from the OrderRequest
         int barId = orderRequest.getBarId();
         int userId = orderRequest.getUserId();
@@ -377,6 +378,8 @@ public class OrderService {
                     "delete",
                     order,
                     "Order canceled successfully."));
+
+            OrderWebSocketHandler.getInstance().sendCancelNotification(orderRequest);
 
             // Initialize the data map for broadcasting
             Map<String, Object> data = new HashMap<>();
