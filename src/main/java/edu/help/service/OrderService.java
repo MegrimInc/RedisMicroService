@@ -114,7 +114,7 @@ public class OrderService {
                     sendOrderResponse(session, new ResponseWrapper(
                             "error",
                             null,
-                            "Order already in progress"));
+                            "Order already in progress. Please cancel the current order before placing a new one."));
                     return;
                 }
             }
