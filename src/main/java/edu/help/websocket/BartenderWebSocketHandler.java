@@ -983,35 +983,6 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
 
     }
 
-
-
-    // public void broadcastToBar(int barID, Map<String, Object> data) throws IOException {
-    //     // Prepare the data to be broadcasted
-    //     String message = objectMapper.writeValueAsString(data);
-
-    //     // Debug: Print the message that is being broadcasted
-    //     System.out.println("Broadcasting message to bar " + barID + ": " + message);
-
-    //     // Iterate over all connected sessions and send the message
-    //     for (Map.Entry<String, WebSocketSession> entry : sessionMap.entrySet()) {
-    //         String sessionID = entry.getKey();
-    //         WebSocketSession wsSession = entry.getValue();
-
-    //         // Debug: Print the session ID and check if the session is open
-    //         System.out.println("Checking session ID: " + sessionID + " (isOpen: " + wsSession.isOpen() + ")");
-
-    //         if (wsSession.isOpen()) {
-    //             // Debug: Print the message before sending it
-    //             System.out.println("Sending message to session ID: " + sessionID);
-    //             wsSession.sendMessage(new TextMessage(message));
-    //         } else {
-    //             // Debug: If session is not open, log it
-    //             System.out.println("Session ID: " + sessionID + " is not open. Skipping.");
-    //         }
-    //     }
-    // }
-
-
     public void broadcastToBar(int barID, Map<String, Object> data) throws IOException {
         // Prepare the data to be broadcasted
         String message = objectMapper.writeValueAsString(data);
@@ -1035,7 +1006,8 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
                     // Step 2: Retrieve the BartenderSession object from Redis
                     BartenderSession bartenderSession = jedisPooled.jsonGet(key, BartenderSession.class);
     
-                    if (bartenderSession != null && bartenderSession.getActive()) {
+                    if (bartenderSession != null //&& bartenderSession.getActive()
+                    ) {
                         matchingSessionIds.add(bartenderSession.getSessionId());
                     }
                 }
