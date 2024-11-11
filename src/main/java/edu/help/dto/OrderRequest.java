@@ -11,6 +11,8 @@ public class OrderRequest {
     private List<DrinkOrder> drinks;
     private boolean inAppPayments;
 
+
+
     @Override
     public String toString() {
         return "OrderRequest{" +
