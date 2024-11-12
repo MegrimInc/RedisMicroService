@@ -1,14 +1,29 @@
 package edu.help.websocket;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.mail.internet.MimeMessage;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import javax.crypto.Cipher;
+import org.springframework.mail.MailException;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+
 import org.json.JSONObject;
+import org.springframework.mail.MailException;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -74,6 +89,11 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             // Handle the action based on its value
             switch (action) {
+
+                case "Claim Tips":
+                    handleClaimTips(session, payloadMap);
+                    break;
+
                 case "initialize":
                     handleInitializeAction(session, payloadMap);
                     break;
@@ -265,6 +285,187 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+
+    private void handleClaimTips(WebSocketSession session, Map<String, Object> payload) {
+        try {
+            // Extract payload information
+            int barID = (int) payload.get("barID");
+            String bartenderName = (String) payload.get("name");
+            String bartenderEmail = (String) payload.get("email"); // equal to "" if no alternateEmail
+            String bartenderID = (String) payload.get("bartenderID"); // equal to "" if no alternateEmail
+
+            // Get current date and format it
+            ZonedDateTime now = ZonedDateTime.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm a z");
+            String formattedDate = now.format(formatter);
+            long dateClaimed = now.toInstant().toEpochMilli();  // Milliseconds timestamp for dateClaimed
+
+            String digitalSignature;
+            String tempPayload = "";
+            String emailReturnPayload = "";
+            String plaintextReturnPayload = "";
+            String returnPayloadJSON = "";
+
+            //Start Saarthak's section
+            List<Order> tipsList = new ArrayList<Order>();
+            String barEmail = "?";
+
+            // [SAARTHAK] Hit postgres and get a list of Orders of unclaimed tips
+            // You only need to set tipsList and barEmail.
+            // [SAARTHAK] Set these to claimed by bartenderID.
+
+
+
+            //end saarthak's section
+
+            // Serialize the data for tempPayload (without digital signature)
+            Map<String, Object> tempPayloadData = Map.of(
+                    "barID", barID,
+                    "bartenderID", bartenderID,
+                    "bartenderName", bartenderName,
+                    "orders", tipsList,
+                    "dateClaimed", dateClaimed
+            );
+            tempPayload = new ObjectMapper().writeValueAsString(tempPayloadData);
+            plaintextReturnPayload = tempPayload.replace('\n', ' ');
+
+            // Generate digital signature
+            digitalSignature = generateDigitalSignature(plaintextReturnPayload);
+
+            // Prepare the return payload JSON, matching the frontend structure
+            Map<String, Object> returnPayloadData = new HashMap<>(tempPayloadData);
+            returnPayloadData.put("digitalSignature", digitalSignature);
+            returnPayloadJSON = new ObjectMapper().writeValueAsString(returnPayloadData);
+
+            // Prepare the email payload content with HTML formatting
+            StringBuilder emailContent = new StringBuilder();
+            emailContent.append("<h1 style='text-align:center;'>Tip Report</h1>")
+                    .append("<h2 style='text-align:center;'>Bar ID: ").append(barID).append("</h2>")
+                    .append("<p style='text-align:center; font-weight:bold;'>Bartender ID: <span style='color:blue;'>")
+                    .append(bartenderID).append("</span> | Bartender Name: <span style='color:blue;'>")
+                    .append(bartenderName).append("</span></p>")
+                    .append("<p style='text-align:center;'>Claimed at: <span style='color:green;'>")
+                    .append(formattedDate).append("</span></p>")
+                    .append("<h3 style='text-align:center; color:darkgreen;'>Total Tip Amount: <span style='color:green;'>$")
+                    .append(calculateTotalTipAmount(tipsList)).append("</span></h3>");
+
+            emailContent.append("<h3>Order Tips:</h3><ul>");
+            for (Order order : tipsList) {
+                ZonedDateTime orderDate = ZonedDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(order.getTimestamp())), now.getZone());
+                String orderFormattedDate = orderDate.format(formatter);
+                emailContent.append("<li><strong>Order ID#</strong> ").append(order.getUserId())
+                        .append(": $").append(order.getTip())
+                        .append(" | ").append(orderFormattedDate).append("</li>");
+            }
+            emailContent.append("</ul>");
+
+            emailContent.append("<br><p><strong>Plaintext:</strong><br>")
+                    .append("<code>").append(plaintextReturnPayload).append("</code></p>")
+                    .append("<p><strong>Server Signature:</strong><br>")
+                    .append("<code>").append(digitalSignature).append("</code></p>");
+
+            // Send emails to the bar and bartender
+            String subject = "Tip Receipt for " + bartenderName + " (Bar #" + barID + ")";
+            try {
+                sendTipEmail(barEmail, subject, emailContent.toString());
+                if (!bartenderEmail.isEmpty())  sendTipEmail(bartenderEmail, subject, emailContent.toString());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+
+            // Send success message with return payload JSON to the frontend
+            session.sendMessage(new TextMessage("{\"action\":\"Tip Claim Successful\", " + returnPayloadJSON + "}"));
+
+        } catch (IOException e) {
+            try {
+                session.sendMessage(new TextMessage("{\"action\":\"Tip Claim Failed\"}"));
+                sendErrorMessage(session, "Tip claim processing failed.");
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+    }
+
+
+    private double calculateTotalTipAmount(List<Order> tipsList) {
+        double totalTipAmount = 0.0;
+        for (Order order : tipsList) {
+            totalTipAmount += order.getTip();
+        }
+        return totalTipAmount;
+    }
+
+    private void sendTipEmail(String email, String subject, String content) {
+        JavaMailSenderImpl test = new JavaMailSenderImpl();
+        test.setHost("email-smtp.us-east-1.amazonaws.com");
+        test.setPort(587);
+
+        test.setUsername("AKIARKMXJUVKGK3ZC6FH");
+        test.setPassword("BJ0EwGiCXsXWcZT2QSI5eR+5yFzbimTnquszEXPaEXsd");
+
+        Properties props = test.getJavaMailProperties();
+        props.put("mail.transport.protocol", "smtp");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.debug", "true");
+
+        try {
+            // Create a MimeMessage
+            MimeMessage message = test.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            // Set the basic email attributes
+            helper.setTo(email);
+            helper.setFrom("noreply@barzzy.site");
+            helper.setSubject(subject);
+
+            // Set the email content as plain text
+            helper.setText(content, true);
+
+            // Send the email
+            test.send(message);
+            System.out.println("Successful send");
+        } catch (Exception ex) {
+            System.err.println(ex.getMessage());
+        }
+    }
+
+
+
+    private String generateDigitalSignature(String plaintextReturnPayload) {
+
+        try {
+            return signText(plaintextReturnPayload, getPrivateKey());
+        } catch (Exception e) {
+            return "Signature Failed. Contact barzzy.llc@gmail.com immediately | " + java.time.Instant.now();
+        }
+    }
+
+    // Load private key from input or file
+    private static PrivateKey getPrivateKey() throws Exception {
+
+        String keyContent = new String(Files.readAllBytes(Paths.get("src", "secret", "private_key.pem")));
+
+
+        keyContent = keyContent.replace("-----BEGIN RSA PRIVATE KEY-----", "")
+                .replace("-----END RSA PRIVATE KEY-----", "")
+                .replaceAll("\\s", "");
+
+        byte[] keyBytes = Base64.getDecoder().decode(keyContent);
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePrivate(keySpec);
+    }
+
+    // Sign text
+    private static String signText(String text, PrivateKey privateKey) throws Exception {
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initSign(privateKey);
+        signature.update(text.getBytes());
+        byte[] digitalSignature = signature.sign();
+        return Base64.getEncoder().encodeToString(digitalSignature);
+    }
 
 
     private void notifyBartendersOfActiveConnections(int barID) {
