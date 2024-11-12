@@ -52,10 +52,33 @@ public class OrderService {
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
 
+        // Fetch the total quantity of items ordered
+    int totalQuantity = orderRequest.getDrinks().stream()
+    .mapToInt(OrderRequest.DrinkOrder::getQuantity)
+    .sum();
+
+// Determine quantity limit based on payment type
+int quantityLimit = orderRequest.isInAppPayments() ? 10 : 3;
+
+// Check if total quantity exceeds the limit
+if (totalQuantity > quantityLimit) {
+    String message = orderRequest.isInAppPayments() 
+        ? "You can only add up to 10 drinks for in-app payment."
+        : "You can only add up to 3 drinks for Pay @ bar option.";
+    
+    System.out.println("Order quantity limit exceeded: " + message);
+
+    // Send error response and exit
+    sendOrderResponse(session, new ResponseWrapper(
+        "error",
+        null,
+        message));
+    return;
+}
+
         // Fetch open and happyHour status from Redis
         String barKey = String.valueOf(orderRequest.getBarId());
         Boolean isOpen = Boolean.valueOf(jedisPooled.hget(barKey, "open"));
-        Boolean isHappyHour = Boolean.valueOf(jedisPooled.hget(barKey, "happyHour"));
 
         // Check if the bar is open
         if (isOpen == null || !isOpen) {
@@ -123,18 +146,7 @@ public class OrderService {
         System.out.println(
                 "No existing order in progress or status is 'delivered' or 'canceled'. Proceeding with order processing.");
 
-        // Set the happy hour status in the OrderRequest
-        if (isHappyHour != null) {
-            orderRequest.setIsHappyHour(isHappyHour);
-        } else {
-            sendOrderResponse(session, new ResponseWrapper(
-                    "error",
-                    null, // No data, as happy hour status is missing
-                    "Failed to retrieve happy hour status."));
-            return;
-        }
-
-        ////RIGHT HERE IS WHERE WE WILL BE WORKING CHIDE 
+       
 
         try {
             // Send order request to PostgreSQL
@@ -144,17 +156,20 @@ public class OrderService {
                     OrderResponse.class);
 
             if (orderResponse != null) {
-                // Create and store the order in Redis
+                
+
                 Order order = new Order(
-                        orderRequest.getBarId(),
-                        orderRequest.getUserId(),
-                        orderResponse.getTotalPrice(),
-                        convertDrinksToOrders(orderResponse.getDrinks()),
-                        "unready",
-                        "",
-                        getCurrentTimestamp(),
-                        session.getId(),
-                        orderRequest.isPoints());
+                    orderRequest.getBarId(),
+                    orderRequest.getUserId(),
+                    orderResponse.getTotalPrice(), // Using the total price from the response
+                    orderResponse.getTip(),
+                    orderRequest.isInAppPayments(), // Assuming this is from the request
+                    convertDrinksToOrders(orderResponse.getDrinks()),
+                    "unready",
+                    "", // Placeholder for claimer
+                    getCurrentTimestamp(),
+                    session.getId()
+            );
 
                 if (!"broke".equals(orderResponse.getMessageType())) {
 
@@ -198,7 +213,13 @@ public class OrderService {
 
     private List<Order.DrinkOrder> convertDrinksToOrders(List<OrderResponse.DrinkOrder> drinkResponses) {
         return drinkResponses.stream()
-                .map(drink -> new Order.DrinkOrder(drink.getDrinkId(), drink.getDrinkName(), drink.getQuantity()))
+                .map(drink -> new Order.DrinkOrder(
+                        drink.getDrinkId(),
+                        drink.getDrinkName(),
+                        drink.getPaymentType(),  // Now using the provided paymentType
+                        drink.getSizeType(),     // Now using the provided sizeType
+                        drink.getQuantity()
+                ))
                 .toList();
     }
 
@@ -324,7 +345,6 @@ public class OrderService {
             }
 
 
-            //////HERE PLZ CHAT GPT THIS IS RIGHT AFTER REDIS CONFIRMS THE ORDER ISNT IN PROGRESS BUT BEFORE IT SET ANYTHING 
             try {
                 OrderResponse refundResponse = restTemplate.postForObject(
                     "http://34.230.32.169:8080/" + barId + "/refundOrder",

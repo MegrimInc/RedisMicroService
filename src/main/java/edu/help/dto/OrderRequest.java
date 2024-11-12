@@ -6,20 +6,22 @@ public class OrderRequest {
 
     private int barId;
     private int userId;
-    private Boolean isHappyHour;
-    private boolean points;
+    private double totalRegularPrice;
+    private double tip; // Renamed field
     private List<DrinkOrder> drinks;
+    private boolean inAppPayments;
 
     @Override
-public String toString() {
-    return "OrderRequest{" +
-            "barId=" + barId +
-            ", userId=" + userId +
-            ", happyHour=" + isHappyHour +
-            ", points=" + points +
-            ", drinks=" + drinks +
-            '}';
-}
+    public String toString() {
+        return "OrderRequest{" +
+                "barId=" + barId +
+                ", userId=" + userId +
+                ", totalRegularPrice=" + totalRegularPrice +
+                ", tip=" + tip + // Updated toString
+                ", drinks=" + drinks +
+                ", inAppPayments=" + inAppPayments +
+                '}';
+    }
 
     // Getters and Setters
     public int getBarId() {
@@ -38,6 +40,22 @@ public String toString() {
         this.userId = userId;
     }
 
+    public double getTotalRegularPrice() {
+        return totalRegularPrice;
+    }
+
+    public void setTotalRegularPrice(double totalRegularPrice) {
+        this.totalRegularPrice = totalRegularPrice;
+    }
+
+    public double getTip() {
+        return tip;
+    }
+
+    public void setTip(double tip) {
+        this.tip = tip;
+    }
+
     public List<DrinkOrder> getDrinks() {
         return drinks;
     }
@@ -46,33 +64,27 @@ public String toString() {
         this.drinks = drinks;
     }
 
-    public void setIsHappyHour(boolean isHappyHour)
-    {
-        this.isHappyHour = isHappyHour;
+    public boolean isInAppPayments() {
+        return inAppPayments;
     }
 
-    public boolean getIsHappyHour()
-    {
-        return isHappyHour;
-    }
-
-    public boolean isPoints() {  // New getter
-        return points;
-    }
-
-    public void setPoints(boolean points) {  // New setter
-        this.points = points;
+    public void setInAppPayments(boolean inAppPayments) {
+        this.inAppPayments = inAppPayments;
     }
 
     public static class DrinkOrder {
         private int drinkId;
         private int quantity;
+        private String paymentType; // "points" or "regular"
+        private String sizeType; // "single" or "double" or empty for drinks without size variations
 
         @Override
         public String toString() {
             return "DrinkOrder{" +
                     "drinkId=" + drinkId +
                     ", quantity=" + quantity +
+                    ", paymentType='" + paymentType + '\'' +
+                    ", sizeType='" + sizeType + '\'' +
                     '}';
         }
 
@@ -91,6 +103,22 @@ public String toString() {
 
         public void setQuantity(int quantity) {
             this.quantity = quantity;
+        }
+
+        public String getPaymentType() {
+            return paymentType;
+        }
+
+        public void setPaymentType(String paymentType) {
+            this.paymentType = paymentType;
+        }
+
+        public String getSizeType() {
+            return sizeType;
+        }
+
+        public void setSizeType(String sizeType) {
+            this.sizeType = sizeType;
         }
     }
 }

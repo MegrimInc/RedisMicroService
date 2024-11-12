@@ -40,10 +40,9 @@
 		</dependency>
 
 		<dependency>
-    <groupId>redis.clients</groupId>
-    <artifactId>jedis</artifactId>
-    <version>5.0.0</version>
-</dependency>
+    		<groupId>redis.clients</groupId>
+    		<artifactId>jedis</artifactId>
+		</dependency>
 
 		<!-- Lombok (optional) -->
 		<dependency>

@@ -22,7 +22,6 @@ import com.eatthepath.pushy.apns.util.SimpleApnsPayloadBuilder;
 import com.eatthepath.pushy.apns.util.SimpleApnsPushNotification;
 import com.eatthepath.pushy.apns.util.TokenUtil;
 import com.eatthepath.pushy.apns.util.concurrent.PushNotificationFuture;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -48,21 +47,21 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             throws InvalidKeyException, SSLException, NoSuchAlgorithmException, IOException {
         this.orderService = orderService;
 
-        this.apnsClient = new ApnsClientBuilder()
-                .setApnsServer(ApnsClientBuilder.PRODUCTION_APNS_HOST) // Use `PRODUCTION_APNS_HOST` for development
-                .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
-                        new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file
-                        "6TK33N3VRX",
-                        "4TSCNPNRJC"))
-                .build();
-
         // this.apnsClient = new ApnsClientBuilder()
-        //         .setApnsServer(ApnsClientBuilder.DEVELOPMENT_APNS_HOST) // Use `DEVELOPMENT_APNS_HOST` for debugging
+        //         .setApnsServer(ApnsClientBuilder.PRODUCTION_APNS_HOST) // Use `PRODUCTION_APNS_HOST` for development
         //         .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
-        //                 new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file     
+        //                 new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file
         //                 "6TK33N3VRX",
         //                 "4TSCNPNRJC"))
         //         .build();
+
+        this.apnsClient = new ApnsClientBuilder()
+                .setApnsServer(ApnsClientBuilder.DEVELOPMENT_APNS_HOST) // Use `DEVELOPMENT_APNS_HOST` for debugging
+                .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
+                        new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file     
+                        "6TK33N3VRX",
+                        "4TSCNPNRJC"))
+                .build();
 
         // Configure ObjectMapper to ignore unknown fields
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -110,8 +109,19 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             String action = (String) payloadMap.get("action");
             payloadMap.remove("action");
 
-            OrderRequest orderRequest = objectMapper.convertValue(payloadMap, new TypeReference<OrderRequest>() {
-            });
+            OrderRequest orderRequest;
+        try {
+            // Attempt to deserialize into OrderRequest
+            orderRequest = objectMapper.convertValue(payloadMap, OrderRequest.class);
+            System.out.println("Parsed OrderRequest: " + orderRequest);
+        } catch (IllegalArgumentException e) {
+            // Send a response if deserialization fails, indicating the user needs to update their app
+            String updateMessage = "We’ve recently updated our app to improve your experience. "
+                + "Please update to the latest version to continue using our service seamlessly.";
+            sendErrorResponse(session, updateMessage);
+            System.err.println("OrderRequest deserialization failed. Prompting user to update their app.");
+            return;
+        }
 
             System.out.println("Action: " + action);
             System.out.println("Parsed OrderRequest: " + orderRequest);

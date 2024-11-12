@@ -20,7 +20,8 @@ WORKDIR /app
 # Copy the JAR file from the build stage
 COPY --from=build /app/target/demo-0.0.1-SNAPSHOT.jar /app/app.jar
 
-COPY src/main/resources/AuthKey_4TSCNPNRJC.p8 /app/AuthKey_4TSCNPNRJC.p8
+# Expose the port that your Spring Boot app will run on
+ EXPOSE 8081
 
 # Command to run the JAR file
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
