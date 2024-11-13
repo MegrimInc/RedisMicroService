@@ -88,6 +88,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String action = (String) payloadMap.get("action");
 
             // Handle the action based on its value
+            System.out.println("Action received:" + action);
             switch (action) {
 
                 case "Claim Tips":
@@ -376,11 +377,13 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
 
             // Send success message with return payload JSON to the frontend
-            session.sendMessage(new TextMessage("{\"action\":\"Tip Claim Successful\", " + returnPayloadJSON + "}"));
+            String trimmedPayload = returnPayloadJSON.substring(1, returnPayloadJSON.length() - 1);
+
+            session.sendMessage(new TextMessage("{\"Tip Claim Successful\":\"Tip Claim Successful\", " + trimmedPayload + "}"));
 
         } catch (IOException e) {
             try {
-                session.sendMessage(new TextMessage("{\"action\":\"Tip Claim Failed\"}"));
+                session.sendMessage(new TextMessage("{\"Tip Claim Failed\":\"Tip Claim Failed\"}"));
                 sendErrorMessage(session, "Tip claim processing failed.");
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
@@ -437,6 +440,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     private String generateDigitalSignature(String plaintextReturnPayload) {
 
         try {
+            System.out.println("attempting sign");
             return signText(plaintextReturnPayload, getPrivateKey());
         } catch (Exception e) {
             return "Signature Failed. Contact barzzy.llc@gmail.com immediately | " + java.time.Instant.now();
@@ -446,12 +450,12 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     // Load private key from input or file
     private static PrivateKey getPrivateKey() throws Exception {
 
-        String keyContent = new String(Files.readAllBytes(Paths.get("src", "secret", "private_key.pem")));
+        String keyContent = "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";
 
 
         keyContent = keyContent.replace("-----BEGIN RSA PRIVATE KEY-----", "")
                 .replace("-----END RSA PRIVATE KEY-----", "")
-                .replaceAll("\\s", "");
+                .replaceAll("\\s", "").replaceAll("\n", "");
 
         byte[] keyBytes = Base64.getDecoder().decode(keyContent);
         PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
