@@ -473,7 +473,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         System.out.println("notifyBartendersOfActiveConnections triggered with barID: " + barID);
 
         String pattern = barID + ".[a-zA-Z]*";
-        System.out.println("Searching for keys with pattern: " + pattern);
+        System.out.println("Searching for keys with pattern ID: " + pattern);
 
         try (Jedis jedis = jedisPool.getResource()) {
             // Find all bartender keys for the given barID
