@@ -1109,7 +1109,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
                             if (!orderJsonObj.toString().contains("active")) {
                                 orders.add(order);
                             } else {
-                                System.out.println("Skipping session-related data for key: " + key);
+                                System.out.println("Skipping session-related data for key ID: " + key);
                             }
                         } catch (JedisDataException e) {
                             System.err.println("Encountered JedisDataException for key: " + key + " - " + e.getMessage());
