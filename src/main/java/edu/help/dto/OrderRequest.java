@@ -6,10 +6,10 @@ public class OrderRequest {
 
     private int barId;
     private int userId;
-    private double totalRegularPrice;
     private double tip; // Renamed field
     private List<DrinkOrder> drinks;
     private boolean inAppPayments;
+    private boolean isHappyHour;
 
 
 
@@ -18,10 +18,10 @@ public class OrderRequest {
         return "OrderRequest{" +
                 "barId=" + barId +
                 ", userId=" + userId +
-                ", totalRegularPrice=" + totalRegularPrice +
                 ", tip=" + tip + // Updated toString
                 ", drinks=" + drinks +
                 ", inAppPayments=" + inAppPayments +
+                ", isHappyHour=" + isHappyHour + 
                 '}';
     }
 
@@ -42,13 +42,6 @@ public class OrderRequest {
         this.userId = userId;
     }
 
-    public double getTotalRegularPrice() {
-        return totalRegularPrice;
-    }
-
-    public void setTotalRegularPrice(double totalRegularPrice) {
-        this.totalRegularPrice = totalRegularPrice;
-    }
 
     public double getTip() {
         return tip;
@@ -72,6 +65,14 @@ public class OrderRequest {
 
     public void setInAppPayments(boolean inAppPayments) {
         this.inAppPayments = inAppPayments;
+    }
+
+    public boolean isHappyHour() { // Getter for isHappyHour
+        return isHappyHour;
+    }
+
+    public void setHappyHour(boolean isHappyHour) { // Setter for isHappyHour
+        this.isHappyHour = isHappyHour;
     }
 
     public static class DrinkOrder {
