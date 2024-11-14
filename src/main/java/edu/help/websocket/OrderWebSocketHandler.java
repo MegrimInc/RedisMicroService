@@ -47,21 +47,21 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             throws InvalidKeyException, SSLException, NoSuchAlgorithmException, IOException {
         this.orderService = orderService;
 
-        // this.apnsClient = new ApnsClientBuilder()
-        //         .setApnsServer(ApnsClientBuilder.PRODUCTION_APNS_HOST) // Use `PRODUCTION_APNS_HOST` for development
-        //         .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
-        //                 new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file
-        //                 "6TK33N3VRX",
-        //                 "4TSCNPNRJC"))
-        //         .build();
-
         this.apnsClient = new ApnsClientBuilder()
-                .setApnsServer(ApnsClientBuilder.DEVELOPMENT_APNS_HOST) // Use `DEVELOPMENT_APNS_HOST` for debugging
+                .setApnsServer(ApnsClientBuilder.PRODUCTION_APNS_HOST) // Use `PRODUCTION_APNS_HOST` for production
                 .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
-                        new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file     
+                        new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file
                         "6TK33N3VRX",
                         "4TSCNPNRJC"))
                 .build();
+
+        // this.apnsClient = new ApnsClientBuilder()
+        //         .setApnsServer(ApnsClientBuilder.DEVELOPMENT_APNS_HOST) // Use `DEVELOPMENT_APNS_HOST` for debugging
+        //         .setSigningKey(ApnsSigningKey.loadFromPkcs8File(
+        //                 new File("/app/AuthKey_4TSCNPNRJC.p8"), // Replace with the path to your .p8 file     
+        //                 "6TK33N3VRX",
+        //                 "4TSCNPNRJC"))
+        //         .build();
 
         // Configure ObjectMapper to ignore unknown fields
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -135,15 +135,6 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                         sendErrorResponse(session, "Invalid order format.");
                     }
 
-                    break;
-                case "delete":
-                    if (orderRequest != null) {
-                        orderService.cancelOrderIfUnclaimed(orderRequest, session); // Pass full OrderRequest
-                        
-                    } else {
-                    sendErrorResponse(session, "Invalid order format.");
-                    }
-                    
                     break;
                 case "refresh":
                     int userIdToRefresh = (int) payloadMap.get("userId");
