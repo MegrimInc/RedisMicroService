@@ -9,7 +9,7 @@ public class OrderRequest {
     private double tip; // Renamed field
     private List<DrinkOrder> drinks;
     private boolean inAppPayments;
-    private boolean isHappyHour;
+    private boolean happyHour;
 
 
 
@@ -21,7 +21,7 @@ public class OrderRequest {
                 ", tip=" + tip + // Updated toString
                 ", drinks=" + drinks +
                 ", inAppPayments=" + inAppPayments +
-                ", isHappyHour=" + isHappyHour + 
+                ", happyHour=" + happyHour + 
                 '}';
     }
 
@@ -68,11 +68,11 @@ public class OrderRequest {
     }
 
     public boolean isHappyHour() { // Getter for isHappyHour
-        return isHappyHour;
+        return happyHour;
     }
 
-    public void setHappyHour(boolean isHappyHour) { // Setter for isHappyHour
-        this.isHappyHour = isHappyHour;
+    public void setHappyHour(boolean happyHour) { // Setter for isHappyHour
+        this.happyHour = happyHour;
     }
 
     public static class DrinkOrder {
