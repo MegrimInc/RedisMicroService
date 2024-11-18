@@ -5,10 +5,12 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 //This is the same as https://github.com/BarzzyLLC/frontend/blob/0.0.0/lib/backend/customerorder2.dart
 public class Order {
+    //private int orderId
     private int barId;
     private int userId;
     private double totalRegularPrice;
-    private double tip; // Renamed field
+    //private int totalPointPrice
+    private double tip;
     private boolean inAppPayments;
     private List<DrinkOrder> drinks;
     private String status;

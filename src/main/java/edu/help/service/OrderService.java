@@ -156,7 +156,9 @@ if (totalQuantity > quantityLimit) {
                     OrderResponse.class);
 
             if (orderResponse != null) {
-                
+                //TODO: WESLEY PLX ADD A NEW FIELD CALLED ORDER ID THAT IS A RANDOM 4 DIGIT NUMBER. CREATE A HELPER METHDO THAT WILL NOT
+                //ONLY GENERATE THIS 4 DIGIT NUMBER BUT ALSO DO A CHECK TO SEE IF ANY ORDERS THAT ARE NOT MARKED AS CANCELED OR DELIVERED 
+                //HAVE AN IDENTICAL ORDER NUMBER AND FAIL THE METHOD AN THEN REGENERATE A NEW ONE (OR THE OTHER WAY AROUND)
 
                 Order order = new Order(
                     orderRequest.getBarId(),
@@ -165,6 +167,7 @@ if (totalQuantity > quantityLimit) {
                     orderResponse.getTip(),
                     orderRequest.isInAppPayments(), // Assuming this is from the request
                     convertDrinksToOrders(orderResponse.getDrinks()),
+                            
                     "unready",
                     "", // Placeholder for claimer
                     getCurrentTimestamp(),
