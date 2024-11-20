@@ -7,22 +7,14 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.mail.internet.MimeMessage;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+
 import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import javax.crypto.Cipher;
-import org.springframework.mail.MailException;
+
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
 import org.json.JSONObject;
-import org.springframework.mail.MailException;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +28,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.BartenderSession;
 import edu.help.dto.Order;
-import edu.help.service.RedisOrderService;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
@@ -550,7 +541,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
 
     @Transactional
-    private void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    public void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
 
         int barID = (int) payload.get("barID");
         String bartenderID = (String) payload.get("bartenderID");
@@ -625,7 +616,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Transactional
-    private void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    public void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
     int barID = (int) payload.get("barID");
     int orderID = (int) payload.get("orderID");
     String bartenderID = (String) payload.get("bartenderID");
@@ -695,7 +686,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
 
 @Transactional
-private void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+public void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
     int barID = (int) payload.get("barID");
     int orderID = (int) payload.get("orderID");
     String cancelingBartenderID = (String) payload.get("bartenderID");
@@ -759,7 +750,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
 
 
     @Transactional
-    private void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    public void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int barID = (int) payload.get("barID");
         int orderID = (int) payload.get("orderID");
         String claimingBartenderID = (String) payload.get("bartenderID");
@@ -839,7 +830,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
     }
 
     @Transactional
-    private void handleReadyAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    public void handleReadyAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int barID = (int) payload.get("barID");
         int orderID = (int) payload.get("orderID");
         String readyBartenderID = (String) payload.get("bartenderID");
@@ -917,7 +908,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
     }
 
     @Transactional
-    private void handleUnclaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    public void handleUnclaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int barID = (int) payload.get("barID");
         int orderID = (int) payload.get("orderID");
         String unclaimingBartenderID = (String) payload.get("bartenderID");
@@ -986,7 +977,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
     }
 
     @Transactional
-    private void handleDisableAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    public void handleDisableAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int barID = (int) payload.get("barID");
         String bartenderID = (String) payload.get("bartenderID");
 
@@ -1066,7 +1057,7 @@ private void handleCancelAction(WebSocketSession session, Map<String, Object> pa
     
 
     @Transactional
-    private void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    public void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int barID = (int) payload.get("barID");
 
         try (Jedis jedis = jedisPool.getResource()) {
