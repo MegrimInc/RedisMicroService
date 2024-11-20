@@ -625,7 +625,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Transactional
-private void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+    private void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
     int barID = (int) payload.get("barID");
     int orderID = (int) payload.get("orderID");
     String bartenderID = (String) payload.get("bartenderID");
