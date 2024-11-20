@@ -9,25 +9,28 @@ public class OrderResponse {
     private double tip; // Renamed field
     private List<DrinkOrder> drinks;
     private String messageType;
+    private int totalPointPrice;
 
     public OrderResponse() {
         // Default constructor
     }
 
-    public OrderResponse(String message, double totalPrice, double tip, List<DrinkOrder> drinks, String messageType) {
+    public OrderResponse(String message, double totalPrice, double tip, List<DrinkOrder> drinks, String messageType, int totalPointPrice) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.tip = tip; // Updated initialization
         this.drinks = drinks;
         this.messageType = messageType;
+        this.totalPointPrice = totalPointPrice;
     }
 
-    public OrderResponse(String message, double totalPrice, double tip, List<DrinkOrder> drinks) {
+    public OrderResponse(String message, double totalPrice, double tip, List<DrinkOrder> drinks, int totalPointPrice) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.tip = tip; // Updated initialization
         this.drinks = drinks;
         this.messageType = "";
+        this.totalPointPrice = totalPointPrice;
     }
 
     
@@ -71,6 +74,14 @@ public class OrderResponse {
 
     public void setMessageType(String messageType) {
         this.messageType = messageType;
+    }
+
+    public int getTotalPointPrice() {
+        return totalPointPrice;
+    }
+
+    public void setTotalPointPrice(int totalPointPrice) {
+        this.totalPointPrice = totalPointPrice;
     }
 
     // Inner class representing a drink order

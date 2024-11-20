@@ -5,11 +5,11 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 //This is the same as https://github.com/BarzzyLLC/frontend/blob/0.0.0/lib/backend/customerorder2.dart
 public class Order {
-    //private int orderId
+    private int orderId;
     private int barId;
     private int userId;
     private double totalRegularPrice;
-    //private int totalPointPrice
+    private int totalPointPrice;
     private double tip;
     private boolean inAppPayments;
     private List<DrinkOrder> drinks;
@@ -18,11 +18,12 @@ public class Order {
     private String timestamp;
     private String sessionId;
 
-    public Order(int barId, int userId, double totalRegularPrice, double tip, boolean inAppPayments,
+    public Order(int orderId, int barId, int userId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
                  List<DrinkOrder> drinks, String status, String claimer, String timestamp, String sessionId) {
         this.barId = barId;
         this.userId = userId;
         this.totalRegularPrice = totalRegularPrice;
+        this.totalPointPrice = totalPointPrice; 
         this.tip = tip; // Updated initialization
         this.inAppPayments = inAppPayments;
         this.drinks = drinks;
@@ -41,6 +42,7 @@ public class Order {
                 "barId=" + barId +
                 ", userId=" + userId +
                 ", totalRegularPrice=" + totalRegularPrice +
+                ", totalPointPrice=" + totalPointPrice +
                 ", tip=" + tip + // Updated toString
                 ", inAppPayments=" + inAppPayments +
                 ", drinks=" + drinks +
@@ -50,8 +52,6 @@ public class Order {
                 ", sessionId='" + sessionId + '\'' +
                 '}';
     }
-
-
 
 
     @JsonProperty("barId")
@@ -153,6 +153,26 @@ public class Order {
     @JsonProperty("sessionId")
     public void setSessionId(String sessionId) {
         this.sessionId = sessionId;
+    }
+
+    @JsonProperty("totalPointPrice")
+    public int getTotalPointPrice() {
+        return totalPointPrice;
+    }
+
+    @JsonProperty("totalPointPrice")
+    public void setTotalPointPrice(int totalPointPrice) {
+        this.totalPointPrice = totalPointPrice;
+    }
+
+    @JsonProperty("orderId")
+    public void setOrderId(int orderId) {
+        this.orderId = orderId;
+    }
+
+    @JsonProperty("orderId")
+    public int getOrderId() {
+        return orderId;
     }
 
     // Updated DrinkOrder class with drinkName

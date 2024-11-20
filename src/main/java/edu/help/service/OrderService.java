@@ -161,9 +161,11 @@ if (totalQuantity > quantityLimit) {
                 //HAVE AN IDENTICAL ORDER NUMBER AND FAIL THE METHOD AN THEN REGENERATE A NEW ONE (OR THE OTHER WAY AROUND)
 
                 Order order = new Order(
+                    0, //HERE IS WHERE YOU NEED TO REPLACE THE ORDER ID WITH SOMETHING GENERATED 
                     orderRequest.getBarId(),
                     orderRequest.getUserId(),
                     orderResponse.getTotalPrice(), // Using the total price from the response
+                    orderResponse.getTotalPointPrice(),
                     orderResponse.getTip(),
                     orderRequest.isInAppPayments(), // Assuming this is from the request
                     convertDrinksToOrders(orderResponse.getDrinks()),
