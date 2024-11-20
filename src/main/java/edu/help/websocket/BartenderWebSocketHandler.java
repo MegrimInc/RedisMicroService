@@ -55,20 +55,18 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>(); // Session storage
     private final OrderWebSocketHandler orderWebSocketHandler;
     private final RestTemplate restTemplate;
-    private final RedisOrderService redisOrderService;
 
     public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool,
-            OrderWebSocketHandler orderWebSocketHandler, RestTemplate restTemplate, RedisOrderService redisOrderService) {
+            OrderWebSocketHandler orderWebSocketHandler, RestTemplate restTemplate) {
         this.jedisPooled = jedisPooled;
         this.jedisPool = jedisPool;
         this.orderWebSocketHandler = orderWebSocketHandler;
         instance = this;
         this.restTemplate = restTemplate;
-        this.redisOrderService = redisOrderService;
 
     }
 
-    // Getter for the singleton instance
+
     public static BartenderWebSocketHandler getInstance() {
         return instance;
     }
