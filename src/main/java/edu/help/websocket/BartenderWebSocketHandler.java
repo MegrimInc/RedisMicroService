@@ -672,7 +672,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
         // Send the order to PostgreSQL
         restTemplate.postForLocation(
-                "http://34.230.32.169:8080/hierarchy/save",
+                "http://34.230.32.169:8080/orders/save",
                 order
             );
 
@@ -736,7 +736,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
 
         // Send the order to PostgreSQL
         restTemplate.postForLocation(
-                "http://34.230.32.169:8080/hierarchy/save",
+                "http://34.230.32.169:8080/orders/save",
                 order
             );
 
