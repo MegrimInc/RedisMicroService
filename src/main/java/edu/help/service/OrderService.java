@@ -165,8 +165,7 @@ if (totalQuantity > quantityLimit) {
                     orderResponse.getTotalPointPrice(),
                     orderResponse.getTip(),
                     orderRequest.isInAppPayments(), // Assuming this is from the request
-                    convertDrinksToOrders(orderResponse.getDrinks()),
-                            
+                    convertDrinksToOrders(orderResponse.getDrinks()),    
                     "unready",
                     "", // Placeholder for claimer
                     getCurrentTimestamp(),

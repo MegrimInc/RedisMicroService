@@ -313,17 +313,5 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             System.err.println("No device token found for userId: " + orderRequest.getUserId());
         }
     }
-    
-    public void sendCancelNotification(OrderRequest orderRequest) {
-            String message = "Order canceled. All points have been refunded";
-    
-            // Retrieve device token
-            String deviceToken = deviceTokenMap.get(String.valueOf(orderRequest.getUserId()));
-            if (deviceToken != null && !deviceToken.isEmpty()) {
-                sendPushNotification(deviceToken, message);
-            } else {
-                System.err.println("No device token found for userId: " + orderRequest.getUserId());
-            }
-        
-    }
+
 }
