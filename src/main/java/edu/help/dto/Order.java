@@ -159,12 +159,12 @@ public class Order {
         this.totalPointPrice = totalPointPrice;
     }
 
-    @JsonProperty("orderId")
+    @JsonProperty("name")
     public void setName(String name) {
         this.name = name;
     }
 
-    @JsonProperty("orderId")
+    @JsonProperty("name")
     public String getName() {
         return name;
     }
