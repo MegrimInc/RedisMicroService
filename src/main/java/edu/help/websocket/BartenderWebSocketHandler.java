@@ -651,8 +651,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
         String currentStatus = order.getStatus();
 
-        if (!"ready".equals(currentStatus)) {
-            sendErrorMessage(session, "Only ready orders can be marked as delivered.");
+        if (!"ready".equals(currentStatus) && !"arrived".equals(currentStatus)) {
+            sendErrorMessage(session, "Only ready or arrived orders can be marked as delivered.");
             jedis.unwatch(); // Unwatch if the order is not ready
             return;
         }
