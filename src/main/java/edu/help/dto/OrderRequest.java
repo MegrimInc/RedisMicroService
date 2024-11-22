@@ -3,7 +3,6 @@ package edu.help.dto;
 import java.util.List;
 
 public class OrderRequest {
-
     private int barId;
     private int userId;
     private double tip; // Renamed field

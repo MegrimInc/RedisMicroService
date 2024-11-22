@@ -3,7 +3,6 @@ package edu.help.dto;
 import java.util.List;
 
 public class OrderResponse {
-
     private String message, name, messageType;
     private double totalPrice, tip;
     private List<DrinkOrder> drinks;

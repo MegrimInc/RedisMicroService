@@ -12,12 +12,13 @@ public class Order {
     private List<DrinkOrder> drinks;
 
     public Order(String name, int barId, int userId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
-                 List<DrinkOrder> drinks, String status, String claimer, String timestamp, String sessionId) {
+            List<DrinkOrder> drinks, String status, String claimer, String timestamp, String sessionId) {
+        this.name = name;
         this.barId = barId;
         this.userId = userId;
         this.totalRegularPrice = totalRegularPrice;
         this.totalPointPrice = totalPointPrice; 
-        this.tip = tip; // Updated initialization
+        this.tip = tip; 
         this.inAppPayments = inAppPayments;
         this.drinks = drinks;
         this.status = status;
