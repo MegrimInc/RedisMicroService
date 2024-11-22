@@ -618,10 +618,10 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     @Transactional
     public void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
     int barID = (int) payload.get("barID");
-    int orderID = (int) payload.get("orderID");
+    int userID = (int) payload.get("userID");
     String bartenderID = (String) payload.get("bartenderID");
 
-    String orderRedisKey = barID + "." + orderID;
+    String orderRedisKey = barID + "." + userID;
 
     try (Jedis jedis = jedisPool.getResource()) {
         jedis.watch(orderRedisKey); // Watch the key for changes
@@ -688,10 +688,10 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 @Transactional
 public void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
     int barID = (int) payload.get("barID");
-    int orderID = (int) payload.get("orderID");
+    int userID = (int) payload.get("userID");
     String cancelingBartenderID = (String) payload.get("bartenderID");
 
-    String orderRedisKey = barID + "." + orderID;
+    String orderRedisKey = barID + "." + userID;
 
     try (Jedis jedis = jedisPool.getResource()) {
         jedis.watch(orderRedisKey); // Watch the key for changes
@@ -752,10 +752,10 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
     @Transactional
     public void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int barID = (int) payload.get("barID");
-        int orderID = (int) payload.get("orderID");
+        int userID = (int) payload.get("userID");
         String claimingBartenderID = (String) payload.get("bartenderID");
 
-        String orderRedisKey = barID + "." + orderID;
+        String orderRedisKey = barID + "." + userID;
 
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.watch(orderRedisKey); // Watch the key for changes
@@ -832,10 +832,10 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
     @Transactional
     public void handleReadyAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int barID = (int) payload.get("barID");
-        int orderID = (int) payload.get("orderID");
+        int userID = (int) payload.get("userID");
         String readyBartenderID = (String) payload.get("bartenderID");
 
-        String orderRedisKey = barID + "." + orderID;
+        String orderRedisKey = barID + "." + userID;
 
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.watch(orderRedisKey); // Watch the key for changes
@@ -910,10 +910,10 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
     @Transactional
     public void handleUnclaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int barID = (int) payload.get("barID");
-        int orderID = (int) payload.get("orderID");
+        int userID = (int) payload.get("userID");
         String unclaimingBartenderID = (String) payload.get("bartenderID");
 
-        String orderRedisKey = barID + "." + orderID;
+        String orderRedisKey = barID + "." + userID;
 
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.watch(orderRedisKey); // Watch the key for changes

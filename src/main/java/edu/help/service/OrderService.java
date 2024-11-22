@@ -156,12 +156,9 @@ if (totalQuantity > quantityLimit) {
                     OrderResponse.class);
 
             if (orderResponse != null) {
-                //TODO: WESLEY PLX ADD A NEW FIELD CALLED ORDER ID THAT IS A RANDOM 4 DIGIT NUMBER. CREATE A HELPER METHDO THAT WILL NOT
-                //ONLY GENERATE THIS 4 DIGIT NUMBER BUT ALSO DO A CHECK TO SEE IF ANY ORDERS THAT ARE NOT MARKED AS CANCELED OR DELIVERED 
-                //HAVE AN IDENTICAL ORDER NUMBER AND FAIL THE METHOD AN THEN REGENERATE A NEW ONE (OR THE OTHER WAY AROUND)
 
                 Order order = new Order(
-                    0, //HERE IS WHERE YOU NEED TO REPLACE THE ORDER ID WITH SOMETHING GENERATED 
+                    orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER ID WITH SOMETHING GENERATED
                     orderRequest.getBarId(),
                     orderRequest.getUserId(),
                     orderResponse.getTotalPrice(), // Using the total price from the response

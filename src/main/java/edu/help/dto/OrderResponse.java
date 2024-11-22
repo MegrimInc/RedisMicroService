@@ -4,36 +4,40 @@ import java.util.List;
 
 public class OrderResponse {
 
-    private String message;
-    private double totalPrice;
-    private double tip; // Renamed field
+    private String message, name, messageType;
+    private double totalPrice, tip;
     private List<DrinkOrder> drinks;
-    private String messageType;
     private int totalPointPrice;
-
+    // And also we will need to check on the frontend how it works.
     public OrderResponse() {
         // Default constructor
     }
 
-    public OrderResponse(String message, double totalPrice, double tip, List<DrinkOrder> drinks, String messageType, int totalPointPrice) {
+    public OrderResponse(String name, String message, double totalPrice, double tip, List<DrinkOrder> drinks, String messageType, int totalPointPrice) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.tip = tip; // Updated initialization
         this.drinks = drinks;
         this.messageType = messageType;
         this.totalPointPrice = totalPointPrice;
+        this.name = name;
     }
 
-    public OrderResponse(String message, double totalPrice, double tip, List<DrinkOrder> drinks, int totalPointPrice) {
+    public OrderResponse(String name, String message, double totalPrice, double tip, List<DrinkOrder> drinks, int totalPointPrice) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.tip = tip; // Updated initialization
         this.drinks = drinks;
         this.messageType = "";
         this.totalPointPrice = totalPointPrice;
+        this.name = name;
     }
 
     
+
+    public String getName() { return name; };
+
+    public void setName(String name) { this.name = name; }
 
     // Getters and Setters
     public String getMessage() {

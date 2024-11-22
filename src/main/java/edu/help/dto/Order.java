@@ -5,20 +5,13 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 //This is the same as https://github.com/BarzzyLLC/frontend/blob/0.0.0/lib/backend/customerorder2.dart
 public class Order {
-    private int orderId;
-    private int barId;
-    private int userId;
-    private double totalRegularPrice;
-    private int totalPointPrice;
-    private double tip;
+    private String sessionId, name, status, claimer, timestamp ; //TODO WESLEY change to string and refactor
+    private int barId, userId, totalPointPrice;
+    private double totalRegularPrice, tip;
     private boolean inAppPayments;
     private List<DrinkOrder> drinks;
-    private String status;
-    private String claimer;
-    private String timestamp;
-    private String sessionId;
 
-    public Order(int orderId, int barId, int userId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
+    public Order(String name, int barId, int userId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
                  List<DrinkOrder> drinks, String status, String claimer, String timestamp, String sessionId) {
         this.barId = barId;
         this.userId = userId;
@@ -39,6 +32,7 @@ public class Order {
     @Override
     public String toString() {
         return "Order{" +
+                "name=" + name +
                 "barId=" + barId +
                 ", userId=" + userId +
                 ", totalRegularPrice=" + totalRegularPrice +
@@ -166,13 +160,13 @@ public class Order {
     }
 
     @JsonProperty("orderId")
-    public void setOrderId(int orderId) {
-        this.orderId = orderId;
+    public void setName(String name) {
+        this.name = name;
     }
 
     @JsonProperty("orderId")
-    public int getOrderId() {
-        return orderId;
+    public String getName() {
+        return name;
     }
 
     // Updated DrinkOrder class with drinkName
