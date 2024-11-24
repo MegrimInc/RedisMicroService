@@ -80,86 +80,13 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             System.out.println("Action received:" + action);
             switch (action) {
 
-                case "Claim Tips":
+                case "claimTips":
                     handleClaimTips(session, payloadMap);
                     break;
 
                 case "initialize":
                     handleInitializeAction(session, payloadMap);
                     break;
-
-                case "happyHour":
-                    int barID3 = (int) payloadMap.get("barID");
-                    String barKey3 = String.valueOf(barID3);  // Adjust this to match your specific key format
-
-                    try (Jedis jedis = jedisPool.getResource()) {
-                        jedis.watch(barKey3);
-
-                        // Check if happy hour is already active
-                        boolean isHappyHourActive = Boolean.parseBoolean(jedis.hget(barKey3, "happyHour"));
-                        if (isHappyHourActive) {
-                            sendErrorMessage(session, "Happy Hour is already active.");
-                            jedis.unwatch();
-                            break;
-                        }
-
-                        Transaction transaction = jedis.multi();
-                        transaction.hset(barKey3, "happyHour", "true");
-                        // Include any other fields that need to be set during happy hour activation
-                        List<Object> results = transaction.exec();
-
-                        if (results != null) {
-                            // Notify all bartenders if the transaction was successful
-                            Map<String, Object> happyHourPayload = new HashMap<>();
-                            happyHourPayload.put("happyHour", true);
-
-                            // Use the existing broadcastToBar method to notify all bartenders
-                            broadcastToBar(barID3, happyHourPayload);
-                        } else {
-                            sendErrorMessage(session, "Failed to start Happy Hour due to a race condition.");
-                        }
-
-                    } catch (Exception e) {
-                        sendErrorMessage(session, "An error occurred while starting Happy Hour.");
-                    }
-                    break;
-
-                case "sadHour":
-                    int barID4 = (int) payloadMap.get("barID");
-                    String barKey4 = String.valueOf(barID4);  // Adjust this to match your specific key format
-
-                    try (Jedis jedis = jedisPool.getResource()) {
-                        jedis.watch(barKey4);
-
-                        // Check if happy hour is already inactive
-                        boolean isHappyHourInactive = !Boolean.parseBoolean(jedis.hget(barKey4, "happyHour"));
-                        if (isHappyHourInactive) {
-                            sendErrorMessage(session, "Happy Hour is already inactive.");
-                            jedis.unwatch();
-                            break;
-                        }
-
-                        Transaction transaction = jedis.multi();
-                        transaction.hset(barKey4, "happyHour", "false");
-                        // Include any other fields that need to be set during sad hour activation
-                        List<Object> results = transaction.exec();
-
-                        if (results != null) {
-                            // Notify all bartenders if the transaction was successful
-                            Map<String, Object> sadHourPayload = new HashMap<>();
-                            sadHourPayload.put("happyHour", false);
-
-                            // Use the existing broadcastToBar method to notify all bartenders
-                            broadcastToBar(barID4, sadHourPayload);
-                        } else {
-                            sendErrorMessage(session, "Failed to end Happy Hour due to a race condition.");
-                        }
-
-                    } catch (Exception e) {
-                        sendErrorMessage(session, "An error occurred while ending Happy Hour.");
-                    }
-                    break;
-
 
                 case "refresh":
                     handleRefreshAction(session, payloadMap);
