@@ -618,58 +618,58 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
     int userID = (int) payload.get("userID");
     String cancelingBartenderID = (String) payload.get("bartenderID");
 
-    String orderRedisKey = barID + "." + userID;
+        String orderRedisKey = barID + "." + userID;
 
-    try (Jedis jedis = jedisPool.getResource()) {
-        jedis.watch(orderRedisKey); // Watch the key for changes
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.watch(orderRedisKey); // Watch the key for changes
 
-        // Retrieve the JSON object from Redis
-        Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
+            // Retrieve the JSON object from Redis
+            Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
 
-        if (orderJsonObj == null) {
-            sendErrorMessage(session, "Order does not exist.");
-            jedis.unwatch(); // Unwatch if the order doesn't exist
-            return;
-        }
+            if (orderJsonObj == null) {
+                sendErrorMessage(session, "Order does not exist.");
+                jedis.unwatch(); // Unwatch if the order doesn't exist
+                return;
+            }
 
-        // Convert the retrieved Object to a JSON string
-        String orderJson = objectMapper.writeValueAsString(orderJsonObj);
+            // Convert the retrieved Object to a JSON string
+            String orderJson = objectMapper.writeValueAsString(orderJsonObj);
 
-        // Deserialize the JSON string into an Order object
-        Order order = objectMapper.readValue(orderJson, Order.class);
+            // Deserialize the JSON string into an Order object
+            Order order = objectMapper.readValue(orderJson, Order.class);
 
-        // Check if the canceling bartender is the one who claimed the order
-        String currentClaimer = order.getClaimer();
-        if (!cancelingBartenderID.equals(currentClaimer)) {
-            sendErrorMessage(session, "You cannot cancel this order as it was claimed by another bartender.");
-            jedis.unwatch(); // Unwatch if the order was claimed by another bartender
-            return;
-        }
+            // Check if the canceling bartender is the one who claimed the order
+            String currentClaimer = order.getClaimer();
+            if (!cancelingBartenderID.equals(currentClaimer)) {
+                sendErrorMessage(session, "You cannot cancel this order as it was claimed by another bartender.");
+                jedis.unwatch(); // Unwatch if the order was claimed by another bartender
+                return;
+            }
 
-        // Update the order status to "canceled"
-        order.setStatus("canceled");
+            // Update the order status to "canceled"
+            order.setStatus("canceled");
 
-        // Start the transaction
-        Transaction transaction = jedis.multi();
-        // Serialize the updated Order object back to JSON and save it to Redis
-        String updatedOrderJson = objectMapper.writeValueAsString(order);
-        transaction.jsonSet(orderRedisKey, updatedOrderJson);
-        List<Object> results = transaction.exec(); // Execute the transaction
+            // Start the transaction
+            Transaction transaction = jedis.multi();
+            // Serialize the updated Order object back to JSON and save it to Redis
+            String updatedOrderJson = objectMapper.writeValueAsString(order);
+            transaction.jsonSet(orderRedisKey, updatedOrderJson);
+            List<Object> results = transaction.exec(); // Execute the transaction
 
-        if (results == null || results.isEmpty()) {
-            sendErrorMessage(session, "Failed to cancel the order due to a conflict. Please try again.");
-            return;
-        }
+            if (results == null || results.isEmpty()) {
+                sendErrorMessage(session, "Failed to cancel the order due to a conflict. Please try again.");
+                return;
+            }
 
-        // Send the order to PostgreSQL
-        restTemplate.postForLocation(
-                "http://34.230.32.169:8080/orders/save",
-                order
+            // Send the order to PostgreSQL
+            restTemplate.postForLocation(
+                    "http://34.230.32.169:8080/orders/save",
+                    order
             );
 
-        // Broadcast the updated order to all bartenders
-        Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-        broadcastToBar(barID, orderData);
+            // Broadcast the updated order to all bartenders
+            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
+            broadcastToBar(barID, orderData);
 
         orderWebSocketHandler.updateUser(orderData);
     }

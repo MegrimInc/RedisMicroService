@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import javax.net.ssl.SSLException;
 
+import edu.help.dto.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -108,23 +109,31 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
 
             String action = (String) payloadMap.get("action");
             payloadMap.remove("action");
+            int barID = -1;
+            int userID = -1;
+            try {
+                userID = (int) payloadMap.get("userId");
+                barID = (int) payloadMap.get("barId");
+            } catch (Exception e) {
+                System.out.println("No userid and barID detected. Proceeding with handleTextMessage");
+            }
 
-            OrderRequest orderRequest;
-        try {
-            // Attempt to deserialize into OrderRequest
-            orderRequest = objectMapper.convertValue(payloadMap, OrderRequest.class);
-            System.out.println("Parsed OrderRequest: " + orderRequest);
-        } catch (IllegalArgumentException e) {
-            // Send a response if deserialization fails, indicating the user needs to update their app
-            String updateMessage = "We’ve recently updated our app to improve your experience. "
-                + "Please update to the latest version to continue using our service seamlessly.";
-            sendErrorResponse(session, updateMessage);
-            System.err.println("OrderRequest deserialization failed. Prompting user to update their app.");
-            return;
-        }
+            OrderRequest orderRequest = null;
+            if("create".equals(action.toLowerCase())) try {
+                // Attempt to deserialize into OrderRequest
+                orderRequest = objectMapper.convertValue(payloadMap, OrderRequest.class);
+                System.out.println("Parsed OrderRequest: " + orderRequest);
+            } catch (IllegalArgumentException e) {
+                // Send a response if deserialization fails, indicating the user needs to update their app
+                String updateMessage = "We’ve recently updated our app to improve your experience. "
+                    + "Please update to the latest version to continue using our service seamlessly.";
+                sendErrorResponse(session, updateMessage);
+                System.err.println("OrderRequest deserialization failed. Prompting user to update their app.");
+                return;
+            }
 
             System.out.println("Action: " + action);
-            System.out.println("Parsed OrderRequest: " + orderRequest);
+            if(orderRequest != null) System.out.println("Parsed OrderRequest: " + orderRequest);
 
             // Handle the action based on its value
             switch (action.toLowerCase()) {
@@ -135,6 +144,15 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                         sendErrorResponse(session, "Invalid order format.");
                     }
 
+                    break;
+
+
+                case "arrive":
+                    if (orderRequest != null) {
+                        orderService.arriveOrder( session, barID, userID);
+                    } else {
+                        sendErrorResponse(session, "Invalid order format.");
+                    }
                     break;
                 case "refresh":
                     int userIdToRefresh = (int) payloadMap.get("userId");
@@ -314,4 +332,12 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    public void sendArrivedNotification(int userID) {
+        String deviceToken = deviceTokenMap.get(String.valueOf(userID));
+        if (deviceToken != null && !deviceToken.isEmpty()) {
+            sendPushNotification(deviceToken, "Your bartender will deliver your order shortly!");
+        } else {
+            System.err.println("No device token found for userId: " + userID);
+        }
+    }
 }
