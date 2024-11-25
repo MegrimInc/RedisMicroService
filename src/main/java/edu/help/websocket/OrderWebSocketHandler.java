@@ -340,7 +340,7 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     public void sendArrivedNotification(int userID) {
         String deviceToken = deviceTokenMap.get(String.valueOf(userID));
         if (deviceToken != null && !deviceToken.isEmpty()) {
-            sendPushNotification(deviceToken, "Your bartender will deliver your order shortly!");
+            sendPushNotification(deviceToken, "You have been marked as 'here' your bartender will call your name shortly");
         } else {
             System.err.println("No device token found for userId: " + userID);
         }

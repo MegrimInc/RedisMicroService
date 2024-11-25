@@ -388,12 +388,7 @@ if (totalQuantity > quantityLimit) {
 
         System.out.println(
                 "Order confirmed exists and is ready. Marking as arrived...");
-
-
-
         try {
-
-
             assert existingOrder != null;
             existingOrder.setStatus("arrived");
 
@@ -407,6 +402,7 @@ if (totalQuantity > quantityLimit) {
                             "Marked as arrived."));
 
                     OrderWebSocketHandler.getInstance().sendArrivedNotification(userID);
+
 
                     // Broadcast the order to bartenders
                     Map<String, Object> data = new HashMap<>();
