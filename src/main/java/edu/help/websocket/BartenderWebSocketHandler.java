@@ -607,7 +607,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
         broadcastToBar(barID, orderData);
 
-        orderWebSocketHandler.updateUser(orderData);
+        orderWebSocketHandler.updateUser(order);
     }
 }
 
@@ -671,7 +671,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
             broadcastToBar(barID, orderData);
 
-        orderWebSocketHandler.updateUser(orderData);
+        orderWebSocketHandler.updateUser(order);
     }
 }
 
@@ -751,7 +751,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
             broadcastToBar(barID, orderData);
 
-            orderWebSocketHandler.updateUser(orderData);
+            orderWebSocketHandler.updateUser(order);
 
         }
     }
@@ -830,7 +830,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
             broadcastToBar(barID, orderData);
 
-            orderWebSocketHandler.updateUser(orderData);
+            orderWebSocketHandler.updateUser(order);
         }
     }
 
@@ -899,7 +899,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
             broadcastToBar(barID, orderData);
 
-            orderWebSocketHandler.updateUser(orderData);
+            orderWebSocketHandler.updateUser(order);
         }
     }
 
