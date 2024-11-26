@@ -6,6 +6,7 @@ import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import edu.help.dto.*;
 import jakarta.mail.internet.MimeMessage;
 
 import java.security.*;
@@ -26,8 +27,6 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import edu.help.dto.BartenderSession;
-import edu.help.dto.Order;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
@@ -297,17 +296,48 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String plaintextReturnPayload = "";
             String returnPayloadJSON = "";
 
-            //Start Saarthak's section
-            List<Order> tipsList = new ArrayList<Order>();
+
+
+
+            // Start Saarthak's section
+
+            List<PostgresOrder> tipsList = new ArrayList<PostgresOrder>(); //new data object to correspond to what postgres sends.
             String barEmail = "temp@diepio.org";
 
-            // [SAARTHAK] Hit postgres and get a list of Orders of unclaimed tips
-            // You only need to set tipsList and barEmail.
-            // [SAARTHAK] Set these to claimed by bartenderID.
+            try {
+                // Create the TipClaimRequest object
+                TipClaimRequest tipClaimRequest = new TipClaimRequest(barID, bartenderName, bartenderEmail, bartenderID);
 
+                // Hit the claim tips endpoint
+                String url = "http://34.230.32.169:8080/orders/claim";
+                TipClaimResponse response = restTemplate.postForObject(url, tipClaimRequest, TipClaimResponse.class);
 
+                // Extract tipsList and barEmail from the response
+                if (response != null) {
+                    tipsList = response.getOrders(); // Orders list
+                    barEmail = response.getBarEmail(); // Bar email
+                } else {
+                    throw new RuntimeException("No response from claim tips endpoint.");
+                }
 
-            //end saarthak's section
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("Error while processing tips claim.", e);
+            }
+// End Saarthak's section
+
+            /**
+             * TODO: WESLEY
+             *
+             * TipsList and barEmail is extracted from PG sucesfully.
+             * There is 1 potential issue.
+             * The orderLIst that I give back represents the order entity in postgres, not the order in redis.
+             * I have created a new class, PostgresOrder.java, that represents the orders that will be sent back to you.
+             * Please change the below (and the helper methods) accordingly, if necessary.
+             * I don't think much change will be required since PostgresOrder.java has all the info that you need anyways.
+             *
+             * SAARTHAK: just did this.
+             */
 
             // Serialize the data for tempPayload (without digital signature)
             Map<String, Object> tempPayloadData = Map.of(
@@ -341,8 +371,8 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     .append(calculateTotalTipAmount(tipsList)).append("</span></h3>");
 
             emailContent.append("<h3>Order Tips:</h3><ul>");
-            for (Order order : tipsList) {
-                ZonedDateTime orderDate = ZonedDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(order.getTimestamp())), now.getZone());
+            for (PostgresOrder order : tipsList) {
+                ZonedDateTime orderDate = ZonedDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(String.valueOf(order.getTimestamp()))), now.getZone());
                 String orderFormattedDate = orderDate.format(formatter);
                 emailContent.append("<li><strong>Order ID#</strong> ").append(order.getUserId())
                         .append(": $").append(order.getTip())
@@ -381,9 +411,9 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     }
 
 
-    private double calculateTotalTipAmount(List<Order> tipsList) {
+    private double calculateTotalTipAmount(List<PostgresOrder> tipsList) {
         double totalTipAmount = 0.0;
-        for (Order order : tipsList) {
+        for (PostgresOrder order : tipsList) {
             totalTipAmount += order.getTip();
         }
         return totalTipAmount;
