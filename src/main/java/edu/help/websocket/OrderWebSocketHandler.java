@@ -109,17 +109,9 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
 
             String action = (String) payloadMap.get("action");
             payloadMap.remove("action");
-            int barID = -1;
-            int userID = -1;
+            
+            OrderRequest orderRequest;
             try {
-                userID = (int) payloadMap.get("userId");
-                barID = (int) payloadMap.get("barId");
-            } catch (Exception e) {
-                System.out.println("No userid and barID detected. Proceeding with handleTextMessage");
-            }
-
-            OrderRequest orderRequest = null;
-            if("create".equals(action.toLowerCase())) try {
                 // Attempt to deserialize into OrderRequest
                 orderRequest = objectMapper.convertValue(payloadMap, OrderRequest.class);
                 System.out.println("Parsed OrderRequest: " + orderRequest);
@@ -131,29 +123,24 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                 System.err.println("OrderRequest deserialization failed. Prompting user to update their app.");
                 return;
             }
-
-            System.out.println("Action: " + action);
-            if(orderRequest != null) System.out.println("Parsed OrderRequest: " + orderRequest);
+    
+                System.out.println("Action: " + action);
+                System.out.println("Parsed OrderRequest: " + orderRequest);
 
             // Handle the action based on its value
             switch (action.toLowerCase()) {
                 case "create":
                     if (orderRequest != null) {
-                        //TODO: Wesley match the call for the method to this
                         orderService.processOrder(orderRequest, session);
                     } else {
                         sendErrorResponse(session, "Invalid order format.");
                     }
-
                     break;
-
-
                 case "arrive":
-                    if (orderRequest != null) {
-                        orderService.arriveOrder( session, barID, userID);
-                    } else {
-                        sendErrorResponse(session, "Invalid order format.");
-                    }
+                    int userId = (int) payloadMap.get("userId");
+                    int barId = (int) payloadMap.get("barId");
+                    orderService.arriveOrder( session, barId, userId);
+                   
                     break;
                 case "refresh":
                     int userIdToRefresh = (int) payloadMap.get("userId");
@@ -340,7 +327,7 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     public void sendArrivedNotification(int userID) {
         String deviceToken = deviceTokenMap.get(String.valueOf(userID));
         if (deviceToken != null && !deviceToken.isEmpty()) {
-            sendPushNotification(deviceToken, "You have been marked as 'here' your bartender will call your name shortly");
+            sendPushNotification(deviceToken, "Your bartender will call your name shortly.");
         } else {
             System.err.println("No device token found for userId: " + userID);
         }
