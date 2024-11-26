@@ -79,86 +79,13 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             System.out.println("Action received:" + action);
             switch (action) {
 
-                case "Claim Tips":
+                case "claimTips":
                     handleClaimTips(session, payloadMap);
                     break;
 
                 case "initialize":
                     handleInitializeAction(session, payloadMap);
                     break;
-
-                case "happyHour":
-                    int barID3 = (int) payloadMap.get("barID");
-                    String barKey3 = String.valueOf(barID3);  // Adjust this to match your specific key format
-
-                    try (Jedis jedis = jedisPool.getResource()) {
-                        jedis.watch(barKey3);
-
-                        // Check if happy hour is already active
-                        boolean isHappyHourActive = Boolean.parseBoolean(jedis.hget(barKey3, "happyHour"));
-                        if (isHappyHourActive) {
-                            sendErrorMessage(session, "Happy Hour is already active.");
-                            jedis.unwatch();
-                            break;
-                        }
-
-                        Transaction transaction = jedis.multi();
-                        transaction.hset(barKey3, "happyHour", "true");
-                        // Include any other fields that need to be set during happy hour activation
-                        List<Object> results = transaction.exec();
-
-                        if (results != null) {
-                            // Notify all bartenders if the transaction was successful
-                            Map<String, Object> happyHourPayload = new HashMap<>();
-                            happyHourPayload.put("happyHour", true);
-
-                            // Use the existing broadcastToBar method to notify all bartenders
-                            broadcastToBar(barID3, happyHourPayload);
-                        } else {
-                            sendErrorMessage(session, "Failed to start Happy Hour due to a race condition.");
-                        }
-
-                    } catch (Exception e) {
-                        sendErrorMessage(session, "An error occurred while starting Happy Hour.");
-                    }
-                    break;
-
-                case "sadHour":
-                    int barID4 = (int) payloadMap.get("barID");
-                    String barKey4 = String.valueOf(barID4);  // Adjust this to match your specific key format
-
-                    try (Jedis jedis = jedisPool.getResource()) {
-                        jedis.watch(barKey4);
-
-                        // Check if happy hour is already inactive
-                        boolean isHappyHourInactive = !Boolean.parseBoolean(jedis.hget(barKey4, "happyHour"));
-                        if (isHappyHourInactive) {
-                            sendErrorMessage(session, "Happy Hour is already inactive.");
-                            jedis.unwatch();
-                            break;
-                        }
-
-                        Transaction transaction = jedis.multi();
-                        transaction.hset(barKey4, "happyHour", "false");
-                        // Include any other fields that need to be set during sad hour activation
-                        List<Object> results = transaction.exec();
-
-                        if (results != null) {
-                            // Notify all bartenders if the transaction was successful
-                            Map<String, Object> sadHourPayload = new HashMap<>();
-                            sadHourPayload.put("happyHour", false);
-
-                            // Use the existing broadcastToBar method to notify all bartenders
-                            broadcastToBar(barID4, sadHourPayload);
-                        } else {
-                            sendErrorMessage(session, "Failed to end Happy Hour due to a race condition.");
-                        }
-
-                    } catch (Exception e) {
-                        sendErrorMessage(session, "An error occurred while ending Happy Hour.");
-                    }
-                    break;
-
 
                 case "refresh":
                     handleRefreshAction(session, payloadMap);
@@ -710,7 +637,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
         broadcastToBar(barID, orderData);
 
-        orderWebSocketHandler.updateUser(orderData);
+        orderWebSocketHandler.updateUser(order);
     }
 }
 
@@ -721,60 +648,60 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
     int userID = (int) payload.get("userID");
     String cancelingBartenderID = (String) payload.get("bartenderID");
 
-    String orderRedisKey = barID + "." + userID;
+        String orderRedisKey = barID + "." + userID;
 
-    try (Jedis jedis = jedisPool.getResource()) {
-        jedis.watch(orderRedisKey); // Watch the key for changes
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.watch(orderRedisKey); // Watch the key for changes
 
-        // Retrieve the JSON object from Redis
-        Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
+            // Retrieve the JSON object from Redis
+            Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
 
-        if (orderJsonObj == null) {
-            sendErrorMessage(session, "Order does not exist.");
-            jedis.unwatch(); // Unwatch if the order doesn't exist
-            return;
-        }
+            if (orderJsonObj == null) {
+                sendErrorMessage(session, "Order does not exist.");
+                jedis.unwatch(); // Unwatch if the order doesn't exist
+                return;
+            }
 
-        // Convert the retrieved Object to a JSON string
-        String orderJson = objectMapper.writeValueAsString(orderJsonObj);
+            // Convert the retrieved Object to a JSON string
+            String orderJson = objectMapper.writeValueAsString(orderJsonObj);
 
-        // Deserialize the JSON string into an Order object
-        Order order = objectMapper.readValue(orderJson, Order.class);
+            // Deserialize the JSON string into an Order object
+            Order order = objectMapper.readValue(orderJson, Order.class);
 
-        // Check if the canceling bartender is the one who claimed the order
-        String currentClaimer = order.getClaimer();
-        if (!cancelingBartenderID.equals(currentClaimer)) {
-            sendErrorMessage(session, "You cannot cancel this order as it was claimed by another bartender.");
-            jedis.unwatch(); // Unwatch if the order was claimed by another bartender
-            return;
-        }
+            // Check if the canceling bartender is the one who claimed the order
+            String currentClaimer = order.getClaimer();
+            if (!cancelingBartenderID.equals(currentClaimer)) {
+                sendErrorMessage(session, "You cannot cancel this order as it was claimed by another bartender.");
+                jedis.unwatch(); // Unwatch if the order was claimed by another bartender
+                return;
+            }
 
-        // Update the order status to "canceled"
-        order.setStatus("canceled");
+            // Update the order status to "canceled"
+            order.setStatus("canceled");
 
-        // Start the transaction
-        Transaction transaction = jedis.multi();
-        // Serialize the updated Order object back to JSON and save it to Redis
-        String updatedOrderJson = objectMapper.writeValueAsString(order);
-        transaction.jsonSet(orderRedisKey, updatedOrderJson);
-        List<Object> results = transaction.exec(); // Execute the transaction
+            // Start the transaction
+            Transaction transaction = jedis.multi();
+            // Serialize the updated Order object back to JSON and save it to Redis
+            String updatedOrderJson = objectMapper.writeValueAsString(order);
+            transaction.jsonSet(orderRedisKey, updatedOrderJson);
+            List<Object> results = transaction.exec(); // Execute the transaction
 
-        if (results == null || results.isEmpty()) {
-            sendErrorMessage(session, "Failed to cancel the order due to a conflict. Please try again.");
-            return;
-        }
+            if (results == null || results.isEmpty()) {
+                sendErrorMessage(session, "Failed to cancel the order due to a conflict. Please try again.");
+                return;
+            }
 
-        // Send the order to PostgreSQL
-        restTemplate.postForLocation(
-                "http://34.230.32.169:8080/orders/save",
-                order
+            // Send the order to PostgreSQL
+            restTemplate.postForLocation(
+                    "http://34.230.32.169:8080/orders/save",
+                    order
             );
 
-        // Broadcast the updated order to all bartenders
-        Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-        broadcastToBar(barID, orderData);
+            // Broadcast the updated order to all bartenders
+            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
+            broadcastToBar(barID, orderData);
 
-        orderWebSocketHandler.updateUser(orderData);
+        orderWebSocketHandler.updateUser(order);
     }
 }
 
@@ -854,7 +781,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
             broadcastToBar(barID, orderData);
 
-            orderWebSocketHandler.updateUser(orderData);
+            orderWebSocketHandler.updateUser(order);
 
         }
     }
@@ -933,7 +860,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
             broadcastToBar(barID, orderData);
 
-            orderWebSocketHandler.updateUser(orderData);
+            orderWebSocketHandler.updateUser(order);
         }
     }
 
@@ -1002,7 +929,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
             broadcastToBar(barID, orderData);
 
-            orderWebSocketHandler.updateUser(orderData);
+            orderWebSocketHandler.updateUser(order);
         }
     }
 

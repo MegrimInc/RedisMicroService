@@ -323,4 +323,106 @@ if (totalQuantity > quantityLimit) {
         }
     }
 
+    public void arriveOrder(WebSocketSession session, int barID, int userID) {
+
+        System.out.println("ArrivingOrder order for barId: " + barID);
+
+        // Fetch open and happyHour status from Redis
+        String orderKey = barID + "." + userID;
+        Order existingOrder = null;
+
+
+
+        System.out.println("Parsed order key: " + orderKey);
+
+
+        if (jedisPooled.exists(orderKey)) {
+            System.out.println("Order key exists in Redis: " + orderKey);
+
+            // Retrieve the JSON object as a raw object
+            Object orderJsonObj = jedisPooled.jsonGet(orderKey);
+            System.out.println("Raw JSON object retrieved: " + orderJsonObj);
+
+            if (orderJsonObj != null) {
+                // Convert the JSON object to a string
+                String orderJson;
+                try {
+                    orderJson = objectMapper.writeValueAsString(orderJsonObj);
+                    System.out.println("Order JSON string: " + orderJson);
+                } catch (JsonProcessingException e) {
+                    System.err.println("Failed to serialize existing order data: " + e.getMessage());
+                    sendOrderResponse(session, new ResponseWrapper(
+                            "error",
+                            null,
+                            "Failed to process existing order data."));
+                    return;
+                }
+
+                // Deserialize the string back into an Order object
+                try {
+                    existingOrder = objectMapper.readValue(orderJson, Order.class);
+                    System.out.println("Deserialized Order object: " + existingOrder);
+                } catch (JsonProcessingException e) {
+                    System.err.println("Failed to deserialize existing order data: " + e.getMessage());
+                    sendOrderResponse(session, new ResponseWrapper(
+                            "error",
+                            null,
+                            "Failed to process existing order data."));
+                    return;
+                }
+
+                // Check the status of the existing order
+                String existingStatus = existingOrder.getStatus();
+                System.out.println("Existing order status: " + existingStatus);
+
+                if ( !"ready".equals(existingStatus) ) {
+                    System.out.println("Order not ready : status=" + existingStatus);
+                    sendOrderResponse(session, new ResponseWrapper(
+                            "error",
+                            null,
+                            "Your order is not ready!"));
+                    return;
+                }
+            }
+        }
+
+        System.out.println(
+                "Order confirmed exists and is ready. Marking as arrived...");
+        try {
+            assert existingOrder != null;
+            existingOrder.setStatus("arrived");
+
+
+                    jedisPooled.jsonSetWithEscape(orderKey, existingOrder);
+                    System.out.println("Re-Stored order in Redis with key: " + orderKey);
+
+                    sendOrderResponse(session, new ResponseWrapper(
+                            "update",
+                            existingOrder,
+                            "Marked as arrived."));
+
+                    OrderWebSocketHandler.getInstance().sendArrivedNotification(userID);
+
+
+                    // Broadcast the order to bartenders
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("orders", Collections.singletonList(existingOrder));
+                    try {
+                        BartenderWebSocketHandler.getInstance().broadcastToBar(existingOrder.getBarId(), data);
+                        System.out.println("Notified Bartenders that person is arrived");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+
+
+        } catch (RestClientException e) {
+            e.printStackTrace();
+            sendOrderResponse(session, new ResponseWrapper(
+                    "error",
+                    null,
+                    "Sorry, it looks like our servers are down. Check back later!"));
+        }
+
+    }
 }

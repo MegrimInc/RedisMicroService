@@ -25,6 +25,7 @@ import com.eatthepath.pushy.apns.util.concurrent.PushNotificationFuture;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import edu.help.dto.Order;
 import edu.help.dto.OrderRequest;
 import edu.help.dto.ResponseWrapper;
 import edu.help.service.OrderService;
@@ -108,33 +109,51 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
 
             String action = (String) payloadMap.get("action");
             payloadMap.remove("action");
+            int barID = -1;
+            int userID = -1;
+            try {
+                userID = (int) payloadMap.get("userId");
+                barID = (int) payloadMap.get("barId");
+            } catch (Exception e) {
+                System.out.println("No userid and barID detected. Proceeding with handleTextMessage");
+            }
 
-            OrderRequest orderRequest;
-        try {
-            // Attempt to deserialize into OrderRequest
-            orderRequest = objectMapper.convertValue(payloadMap, OrderRequest.class);
-            System.out.println("Parsed OrderRequest: " + orderRequest);
-        } catch (IllegalArgumentException e) {
-            // Send a response if deserialization fails, indicating the user needs to update their app
-            String updateMessage = "We’ve recently updated our app to improve your experience. "
-                + "Please update to the latest version to continue using our service seamlessly.";
-            sendErrorResponse(session, updateMessage);
-            System.err.println("OrderRequest deserialization failed. Prompting user to update their app.");
-            return;
-        }
+            OrderRequest orderRequest = null;
+            if("create".equals(action.toLowerCase())) try {
+                // Attempt to deserialize into OrderRequest
+                orderRequest = objectMapper.convertValue(payloadMap, OrderRequest.class);
+                System.out.println("Parsed OrderRequest: " + orderRequest);
+            } catch (IllegalArgumentException e) {
+                // Send a response if deserialization fails, indicating the user needs to update their app
+                String updateMessage = "We’ve recently updated our app to improve your experience. "
+                    + "Please update to the latest version to continue using our service seamlessly.";
+                sendErrorResponse(session, updateMessage);
+                System.err.println("OrderRequest deserialization failed. Prompting user to update their app.");
+                return;
+            }
 
             System.out.println("Action: " + action);
-            System.out.println("Parsed OrderRequest: " + orderRequest);
+            if(orderRequest != null) System.out.println("Parsed OrderRequest: " + orderRequest);
 
             // Handle the action based on its value
             switch (action.toLowerCase()) {
                 case "create":
                     if (orderRequest != null) {
+                        //TODO: Wesley match the call for the method to this
                         orderService.processOrder(orderRequest, session);
                     } else {
                         sendErrorResponse(session, "Invalid order format.");
                     }
 
+                    break;
+
+
+                case "arrive":
+                    if (orderRequest != null) {
+                        orderService.arriveOrder( session, barID, userID);
+                    } else {
+                        sendErrorResponse(session, "Invalid order format.");
+                    }
                     break;
                 case "refresh":
                     int userIdToRefresh = (int) payloadMap.get("userId");
@@ -187,35 +206,41 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    public void updateUser(Map<String, Object> orderData) throws IOException {
-        String status = (String) orderData.get("status"); // Extract status from orderData
-        String claimer = (String) orderData.get("claimer"); // Extract claimer, default to empty string
-        String sessionId = (String) orderData.get("sessionId");
-        int userId = (int) orderData.get("userId");
-        String deviceToken = deviceTokenMap.get(String.valueOf(userId));
-
-        // Retrieve the session from the sessionMap using the sessionId
+    public void updateUser(Order order) throws IOException {
+        // Extract required fields from the Order object
+        String status = order.getStatus(); // Get the order status
+        String claimer = order.getClaimer() != null ? order.getClaimer() : ""; // Default to empty if null
+        String sessionId = order.getSessionId(); // Retrieve session ID from the order
+        Boolean inAppPayments = order.isInAppPayments(); // Retrieve inApp bool from the order
+        int userId = order.getUserId(); // Retrieve user ID
+        String deviceToken = deviceTokenMap.get(String.valueOf(userId)); // Lookup device token using userId
+        // Calculate total quantity of drinks from the Order object
+        int totalQuantity = order.getDrinks().stream()
+            .mapToInt(Order.DrinkOrder::getQuantity)
+            .sum();
+    
+        // Retrieve the WebSocket session from the sessionMap using the sessionId
         WebSocketSession userSession = sessionMap.get(sessionId);
-
-        // If the session is found and open, send the message
+    
+        // Send WebSocket message if the session is found and open
         if (userSession != null && userSession.isOpen()) {
-            // Create a ResponseWrapper with the update information
+            // Wrap the order into a ResponseWrapper for the update
             ResponseWrapper response = new ResponseWrapper(
-                    "update", // messageType
-                    orderData, // data to send
-                    "Order update successful." // message
+                    "update", // Message type
+                    objectMapper.convertValue(order, Map.class), // Convert order to Map
+                    "Order update successful." // Message
             );
-
+    
             // Convert the ResponseWrapper to a JSON string
             String jsonResponse = objectMapper.writeValueAsString(response);
-
-            // Send the response to the user
+    
+            // Send the JSON response to the user via WebSocket
             userSession.sendMessage(new TextMessage(jsonResponse));
         } else {
             System.err.println("User session not found or closed: " + sessionId);
         }
-
-        // Check if the deviceToken is not null and not empty
+    
+        // Send push notification if the deviceToken exists
         if (deviceToken != null && !deviceToken.isEmpty()) {
             // Construct the notification message based on the order status and claimer
             String notificationMessage;
@@ -229,23 +254,26 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                     notificationMessage = "Your order is now ready at station \"" + claimer + "\".";
                     break;
                 case "delivered":
-                    notificationMessage = "Station \"" + claimer + "\" has delivered your order.";
+                    notificationMessage = "Order completed! " + (totalQuantity * 75) + " pts have been awarded to your account!";
                     break;
                 case "canceled":
-                    notificationMessage = "Station \"" + claimer + "\" has canceled your order.";
+                if (inAppPayments) {
+                    notificationMessage = "Order canceled! " + (totalQuantity * 75) + " pts will still be awarded to your account!";
+                } else {
+                    notificationMessage = "Order canceled! No points will be awarded to your account!";
+                }
                     break;
                 default:
                     System.err.println("Unknown order status: " + status);
                     return; // Exit early if status is not recognized
             }
-
+    
             // Send the push notification with the constructed message
             System.out.println("Sending push notification: " + notificationMessage);
             sendPushNotification(deviceToken, notificationMessage);
         } else {
             System.err.println("No device token found for userId: " + userId + ", unable to send push notification.");
         }
-
     }
 
     // Method to update the deviceTokenMap from OrderService
@@ -298,13 +326,8 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     }
 
     public void sendCreateNotification(OrderRequest orderRequest) {
-        // Calculate total quantity for points
-        int totalQuantity = orderRequest.getDrinks().stream()
-                .mapToInt(OrderRequest.DrinkOrder::getQuantity)
-                .sum();
-        String message = "Order placed! " + (totalQuantity * 75) + 
-                         " pts have been awarded to your account!";
-    
+        String message = "Your order has been placed!";
+
         // Retrieve device token
         String deviceToken = deviceTokenMap.get(String.valueOf(orderRequest.getUserId()));
         if (deviceToken != null && !deviceToken.isEmpty()) {
@@ -314,4 +337,12 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    public void sendArrivedNotification(int userID) {
+        String deviceToken = deviceTokenMap.get(String.valueOf(userID));
+        if (deviceToken != null && !deviceToken.isEmpty()) {
+            sendPushNotification(deviceToken, "You have been marked as 'here' your bartender will call your name shortly");
+        } else {
+            System.err.println("No device token found for userId: " + userID);
+        }
+    }
 }
