@@ -211,6 +211,12 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String bartenderEmail = (String) payload.get("email"); // equal to "" if no alternateEmail
             String bartenderID = (String) payload.get("bartenderID"); // equal to "" if no alternateEmail
 
+            // Debugging statements
+            System.out.println("barID: " + barID);
+            System.out.println("bartenderName: " + bartenderName);
+            System.out.println("bartenderEmail: " + bartenderEmail);
+            System.out.println("bartenderID: " + bartenderID);
+
             // Get current date and format it
             ZonedDateTime now = ZonedDateTime.now();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm a z");
@@ -223,48 +229,45 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             String plaintextReturnPayload = "";
             String returnPayloadJSON = "";
 
-
-
-
             // Start Saarthak's section
-
-            List<PostgresOrder> tipsList = new ArrayList<PostgresOrder>(); //new data object to correspond to what postgres sends.
+            List<PostgresOrder> tipsList = new ArrayList<>(); // new data object to correspond to what postgres sends.
             String barEmail = "temp@diepio.org";
 
             try {
                 // Create the TipClaimRequest object
                 TipClaimRequest tipClaimRequest = new TipClaimRequest(barID, bartenderName, bartenderEmail, bartenderID);
 
+                // Debugging statement
+                System.out.println("TipClaimRequest: " + tipClaimRequest);
+
                 // Hit the claim tips endpoint
                 String url = "http://34.230.32.169:8080/orders/claim";
+                System.out.println("Sending POST request to: " + url);
+
                 TipClaimResponse response = restTemplate.postForObject(url, tipClaimRequest, TipClaimResponse.class);
+
+                // Debugging statement
+                System.out.println("Received response from backend: " + response);
 
                 // Extract tipsList and barEmail from the response
                 if (response != null) {
                     tipsList = response.getOrders(); // Orders list
                     barEmail = response.getBarEmail(); // Bar email
+
+                    // Debugging statements
+                    System.out.println("tipsList size: " + tipsList.size());
+                    System.out.println("barEmail: " + barEmail);
                 } else {
+                    System.out.println("No response from claim tips endpoint.");
                     throw new RuntimeException("No response from claim tips endpoint.");
                 }
 
             } catch (Exception e) {
+                System.out.println("Exception in Saarthak's section:");
                 e.printStackTrace();
                 throw new RuntimeException("Error while processing tips claim.", e);
             }
-// End Saarthak's section
-
-            /**
-             * TODO: WESLEY
-             *
-             * TipsList and barEmail is extracted from PG sucesfully.
-             * There is 1 potential issue.
-             * The orderLIst that I give back represents the order entity in postgres, not the order in redis.
-             * I have created a new class, PostgresOrder.java, that represents the orders that will be sent back to you.
-             * Please change the below (and the helper methods) accordingly, if necessary.
-             * I don't think much change will be required since PostgresOrder.java has all the info that you need anyways.
-             *
-             * SAARTHAK: just did this.
-             */
+            // End Saarthak's section
 
             // Serialize the data for tempPayload (without digital signature)
             Map<String, Object> tempPayloadData = Map.of(
@@ -274,16 +277,41 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
                     "orders", tipsList,
                     "dateClaimed", dateClaimed
             );
-            tempPayload = new ObjectMapper().writeValueAsString(tempPayloadData);
-            plaintextReturnPayload = tempPayload.replace('\n', ' ');
+
+            try {
+                tempPayload = new ObjectMapper().writeValueAsString(tempPayloadData);
+                plaintextReturnPayload = tempPayload.replace('\n', ' ');
+                // Debugging statements
+                System.out.println("Plaintext payload: " + plaintextReturnPayload);
+            } catch (Exception e) {
+                System.out.println("Exception while serializing tempPayloadData:");
+                e.printStackTrace();
+                throw new RuntimeException("Error serializing tempPayloadData.", e);
+            }
 
             // Generate digital signature
-            digitalSignature = generateDigitalSignature(plaintextReturnPayload);
+            try {
+                digitalSignature = generateDigitalSignature(plaintextReturnPayload);
+                System.out.println("Digital signature generated successfully.");
+            } catch (Exception e) {
+                System.out.println("Exception while generating digital signature:");
+                e.printStackTrace();
+                throw new RuntimeException("Error generating digital signature.", e);
+            }
 
             // Prepare the return payload JSON, matching the frontend structure
             Map<String, Object> returnPayloadData = new HashMap<>(tempPayloadData);
             returnPayloadData.put("digitalSignature", digitalSignature);
-            returnPayloadJSON = new ObjectMapper().writeValueAsString(returnPayloadData);
+
+            try {
+                returnPayloadJSON = new ObjectMapper().writeValueAsString(returnPayloadData);
+                // Debugging statement
+                System.out.println("Return payload JSON: " + returnPayloadJSON);
+            } catch (Exception e) {
+                System.out.println("Exception while serializing returnPayloadData:");
+                e.printStackTrace();
+                throw new RuntimeException("Error serializing returnPayloadData.", e);
+            }
 
             // Prepare the email payload content with HTML formatting
             StringBuilder emailContent = new StringBuilder();
@@ -299,11 +327,17 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
             emailContent.append("<h3>Order Tips:</h3><ul>");
             for (PostgresOrder order : tipsList) {
-                ZonedDateTime orderDate = ZonedDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(String.valueOf(order.getTimestamp()))), now.getZone());
-                String orderFormattedDate = orderDate.format(formatter);
-                emailContent.append("<li><strong>Order ID#</strong> ").append(order.getUserId())
-                        .append(": $").append(order.getTip())
-                        .append(" | ").append(orderFormattedDate).append("</li>");
+                try {
+                    ZonedDateTime orderDate = ZonedDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(String.valueOf(order.getTimestamp()))), now.getZone());
+                    String orderFormattedDate = orderDate.format(formatter);
+                    emailContent.append("<li><strong>Order ID#</strong> ").append(order.getUserId())
+                            .append(": $").append(order.getTip())
+                            .append(" | ").append(orderFormattedDate).append("</li>");
+                } catch (Exception e) {
+                    System.out.println("Exception while processing order in tipsList:");
+                    e.printStackTrace();
+                    throw new RuntimeException("Error processing order in tipsList.", e);
+                }
             }
             emailContent.append("</ul>");
 
@@ -315,27 +349,56 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             // Send emails to the bar and bartender
             String subject = "Tip Receipt for " + bartenderName + " (Bar #" + barID + ")";
             try {
+                System.out.println("Sending email to barEmail: " + barEmail);
                 sendTipEmail(barEmail, subject, emailContent.toString());
-                if (!bartenderEmail.isEmpty())  sendTipEmail(bartenderEmail, subject, emailContent.toString());
+                if (!bartenderEmail.isEmpty()) {
+                    System.out.println("Sending email to bartenderEmail: " + bartenderEmail);
+                    sendTipEmail(bartenderEmail, subject, emailContent.toString());
+                }
             } catch (Exception e) {
+                System.out.println("Exception while sending emails:");
+                e.printStackTrace();
                 throw new RuntimeException(e);
             }
 
-
             // Send success message with return payload JSON to the frontend
             String trimmedPayload = returnPayloadJSON.substring(1, returnPayloadJSON.length() - 1);
+            System.out.println("Sending success message to frontend: " + trimmedPayload);
 
-            session.sendMessage(new TextMessage("{\"Tip Claim Successful\":\"Tip Claim Successful\", " + trimmedPayload + "}"));
+            try {
+                session.sendMessage(new TextMessage("{\"Tip Claim Successful\":\"Tip Claim Successful\", " + trimmedPayload + "}"));
+                System.out.println("Success message sent to frontend.");
+            } catch (IOException e) {
+                System.out.println("IOException while sending success message:");
+                e.printStackTrace();
+                throw e; // Rethrow to be caught by outer catch block
+            }
 
         } catch (IOException e) {
+            System.out.println("IOException caught in outer try-catch:");
+            e.printStackTrace();
             try {
                 session.sendMessage(new TextMessage("{\"Tip Claim Failed\":\"Tip Claim Failed\"}"));
-                sendErrorMessage(session, "Tip claim processing failed.");
+                sendErrorMessage(session, "Tip claim processing failed due to IOException.");
             } catch (IOException ex) {
+                System.out.println("IOException while sending error message:");
+                ex.printStackTrace();
+                throw new RuntimeException(ex);
+            }
+        } catch (Exception e) {
+            System.out.println("Exception caught in outer try-catch:");
+            e.printStackTrace();
+            try {
+                session.sendMessage(new TextMessage("{\"Tip Claim Failed\":\"Tip Claim Failed\"}"));
+                sendErrorMessage(session, "Tip claim processing failed due to an error.");
+            } catch (IOException ex) {
+                System.out.println("IOException while sending error message:");
+                ex.printStackTrace();
                 throw new RuntimeException(ex);
             }
         }
     }
+
 
 
     private double calculateTotalTipAmount(List<PostgresOrder> tipsList) {
