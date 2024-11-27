@@ -203,6 +203,9 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
 
 
     private void handleClaimTips(WebSocketSession session, Map<String, Object> payload) {
+
+
+        //call postgres here
         System.out.println("Handling tips...");
         try {
             // Extract payload information
