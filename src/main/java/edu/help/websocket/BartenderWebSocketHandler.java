@@ -1,25 +1,14 @@
 package edu.help.websocket;
 
 import java.io.IOException;
-import java.security.KeyFactory;
-import java.security.PrivateKey;
-import java.security.Signature;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.json.JSONObject;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -32,10 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.help.dto.BartenderSession;
 import edu.help.dto.Order;
-import edu.help.dto.PostgresOrder;
-import edu.help.dto.TipClaimRequest;
-import edu.help.dto.TipClaimResponse;
-import jakarta.mail.internet.MimeMessage;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
@@ -87,11 +72,6 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             // Handle the action based on its value
             System.out.println("Action received:" + action);
             switch (action) {
-
-                case "claimTips":
-                    handleClaimTips(session, payloadMap);
-                    break;
-
                 case "initialize":
                     handleInitializeAction(session, payloadMap);
                     break;
@@ -211,288 +191,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     }
 
 
-    private void handleClaimTips(WebSocketSession session, Map<String, Object> payload) {
-
-
-        //call postgres here
-        System.out.println("Handling tips...");
-        try {
-            // Extract payload information
-            int barID = (int) payload.get("barID");
-            String bartenderName = (String) payload.get("name");
-            String bartenderEmail = (String) payload.get("email"); // equal to "" if no alternateEmail
-            String bartenderID = (String) payload.get("bartenderID"); // equal to "" if no alternateEmail
-
-            // Debugging statements
-            System.out.println("barID: " + barID);
-            System.out.println("bartenderName: " + bartenderName);
-            System.out.println("bartenderEmail: " + bartenderEmail);
-            System.out.println("bartenderID: " + bartenderID);
-
-            // Get current date and format it
-            ZonedDateTime now = ZonedDateTime.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm a z");
-            String formattedDate = now.format(formatter);
-            long dateClaimed = now.toInstant().toEpochMilli();  // Milliseconds timestamp for dateClaimed
-
-            String digitalSignature;
-            String tempPayload = "";
-            String emailReturnPayload = "";
-            String plaintextReturnPayload = "";
-            String returnPayloadJSON = "";
-
-            // Start Saarthak's section
-            List<PostgresOrder> tipsList = new ArrayList<>(); // new data object to correspond to what postgres sends.
-            String barEmail = "temp@diepio.org";
-
-            try {
-                // Create the TipClaimRequest object
-                TipClaimRequest tipClaimRequest = new TipClaimRequest(barID, bartenderName, bartenderEmail, bartenderID);
-
-                // Debugging statement
-                System.out.println("TipClaimRequest: " + tipClaimRequest);
-
-                // Hit the claim tips endpoint
-                String url = "http://34.230.32.169:8080/orders/claim";
-                System.out.println("Sending POST request to: " + url);
-
-                TipClaimResponse response = restTemplate.postForObject(url, tipClaimRequest, TipClaimResponse.class);
-
-                // Debugging statement
-                System.out.println("Received response from backend: " + response);
-
-                // Extract tipsList and barEmail from the response
-                if (response != null) {
-                    tipsList = response.getOrders(); // Orders list
-                    barEmail = response.getBarEmail(); // Bar email
-
-                    // Debugging statements
-                    System.out.println("tipsList size: " + tipsList.size());
-                    System.out.println("barEmail: " + barEmail);
-                } else {
-                    System.out.println("No response from claim tips endpoint.");
-                    throw new RuntimeException("No response from claim tips endpoint.");
-                }
-
-            } catch (Exception e) {
-                System.out.println("Exception in Saarthak's section:");
-                e.printStackTrace();
-                throw new RuntimeException("Error while processing tips claim.", e);
-            }
-            // End Saarthak's section
-
-            // Serialize the data for tempPayload (without digital signature)
-            Map<String, Object> tempPayloadData = Map.of(
-                    "barID", barID,
-                    "bartenderID", bartenderID,
-                    "bartenderName", bartenderName,
-                    "orders", tipsList,
-                    "dateClaimed", dateClaimed
-            );
-
-            try {
-                tempPayload = new ObjectMapper().writeValueAsString(tempPayloadData);
-                plaintextReturnPayload = tempPayload.replace('\n', ' ');
-                // Debugging statements
-                System.out.println("Plaintext payload: " + plaintextReturnPayload);
-            } catch (Exception e) {
-                System.out.println("Exception while serializing tempPayloadData:");
-                e.printStackTrace();
-                throw new RuntimeException("Error serializing tempPayloadData.", e);
-            }
-
-            // Generate digital signature
-            try {
-                digitalSignature = generateDigitalSignature(plaintextReturnPayload);
-                System.out.println("Digital signature generated successfully.");
-            } catch (Exception e) {
-                System.out.println("Exception while generating digital signature:");
-                e.printStackTrace();
-                throw new RuntimeException("Error generating digital signature.", e);
-            }
-
-            // Prepare the return payload JSON, matching the frontend structure
-            Map<String, Object> returnPayloadData = new HashMap<>(tempPayloadData);
-            returnPayloadData.put("digitalSignature", digitalSignature);
-
-            try {
-                returnPayloadJSON = new ObjectMapper().writeValueAsString(returnPayloadData);
-                // Debugging statement
-                System.out.println("Return payload JSON: " + returnPayloadJSON);
-            } catch (Exception e) {
-                System.out.println("Exception while serializing returnPayloadData:");
-                e.printStackTrace();
-                throw new RuntimeException("Error serializing returnPayloadData.", e);
-            }
-
-            // Prepare the email payload content with HTML formatting
-            StringBuilder emailContent = new StringBuilder();
-            emailContent.append("<h1 style='text-align:center;'>Tip Report</h1>")
-                    .append("<h2 style='text-align:center;'>Bar ID: ").append(barID).append("</h2>")
-                    .append("<p style='text-align:center; font-weight:bold;'>Bartender ID: <span style='color:blue;'>")
-                    .append(bartenderID).append("</span> | Bartender Name: <span style='color:blue;'>")
-                    .append(bartenderName).append("</span></p>")
-                    .append("<p style='text-align:center;'>Claimed at: <span style='color:green;'>")
-                    .append(formattedDate).append("</span></p>")
-                    .append("<h3 style='text-align:center; color:darkgreen;'>Total Tip Amount: <span style='color:green;'>$")
-                    .append(calculateTotalTipAmount(tipsList)).append("</span></h3>");
-
-            emailContent.append("<h3>Order Tips:</h3><ul>");
-            for (PostgresOrder order : tipsList) {
-                try {
-                    ZonedDateTime orderDate = ZonedDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(String.valueOf(order.getTimestamp()))), now.getZone());
-                    String orderFormattedDate = orderDate.format(formatter);
-                    emailContent.append("<li><strong>Order ID#</strong> ").append(order.getUserId())
-                            .append(": $").append(order.getTip())
-                            .append(" | ").append(orderFormattedDate).append("</li>");
-                } catch (Exception e) {
-                    System.out.println("Exception while processing order in tipsList:");
-                    e.printStackTrace();
-                    throw new RuntimeException("Error processing order in tipsList.", e);
-                }
-            }
-            emailContent.append("</ul>");
-
-            emailContent.append("<br><p><strong>Plaintext:</strong><br>")
-                    .append("<code>").append(plaintextReturnPayload).append("</code></p>")
-                    .append("<p><strong>Server Signature:</strong><br>")
-                    .append("<code>").append(digitalSignature).append("</code></p>");
-
-            // Send emails to the bar and bartender
-            String subject = "Tip Receipt for " + bartenderName + " (Bar #" + barID + ")";
-            try {
-                System.out.println("Sending email to barEmail: " + barEmail);
-                sendTipEmail(barEmail, subject, emailContent.toString());
-                if (!bartenderEmail.isEmpty()) {
-                    System.out.println("Sending email to bartenderEmail: " + bartenderEmail);
-                    sendTipEmail(bartenderEmail, subject, emailContent.toString());
-                }
-            } catch (Exception e) {
-                System.out.println("Exception while sending emails:");
-                e.printStackTrace();
-                throw new RuntimeException(e);
-            }
-
-            // Send success message with return payload JSON to the frontend
-            String trimmedPayload = returnPayloadJSON.substring(1, returnPayloadJSON.length() - 1);
-            System.out.println("Sending success message to frontend: " + trimmedPayload);
-
-            try {
-                session.sendMessage(new TextMessage("{\"Tip Claim Successful\":\"Tip Claim Successful\", " + trimmedPayload + "}"));
-                System.out.println("Success message sent to frontend.");
-            } catch (IOException e) {
-                System.out.println("IOException while sending success message:");
-                e.printStackTrace();
-                throw e; // Rethrow to be caught by outer catch block
-            }
-
-        } catch (IOException e) {
-            System.out.println("IOException caught in outer try-catch:");
-            e.printStackTrace();
-            try {
-                session.sendMessage(new TextMessage("{\"Tip Claim Failed\":\"Tip Claim Failed\"}"));
-                sendErrorMessage(session, "Tip claim processing failed due to IOException.");
-            } catch (IOException ex) {
-                System.out.println("IOException while sending error message:");
-                ex.printStackTrace();
-                throw new RuntimeException(ex);
-            }
-        } catch (Exception e) {
-            System.out.println("Exception caught in outer try-catch:");
-            e.printStackTrace();
-            try {
-                session.sendMessage(new TextMessage("{\"Tip Claim Failed\":\"Tip Claim Failed\"}"));
-                sendErrorMessage(session, "Tip claim processing failed due to an error.");
-            } catch (IOException ex) {
-                System.out.println("IOException while sending error message:");
-                ex.printStackTrace();
-                throw new RuntimeException(ex);
-            }
-        }
-    }
-
-
-
-    private double calculateTotalTipAmount(List<PostgresOrder> tipsList) {
-        double totalTipAmount = 0.0;
-        for (PostgresOrder order : tipsList) {
-            totalTipAmount += order.getTip();
-        }
-        return totalTipAmount;
-    }
-
-    private void sendTipEmail(String email, String subject, String content) {
-        JavaMailSenderImpl test = new JavaMailSenderImpl();
-        test.setHost("email-smtp.us-east-1.amazonaws.com");
-        test.setPort(587);
-
-        test.setUsername("AKIARKMXJUVKGK3ZC6FH");
-        test.setPassword("BJ0EwGiCXsXWcZT2QSI5eR+5yFzbimTnquszEXPaEXsd");
-
-        Properties props = test.getJavaMailProperties();
-        props.put("mail.transport.protocol", "smtp");
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.debug", "true");
-
-        try {
-            // Create a MimeMessage
-            MimeMessage message = test.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-            // Set the basic email attributes
-            helper.setTo(email);
-            helper.setFrom("noreply@barzzy.site");
-            helper.setSubject(subject);
-
-            // Set the email content as plain text
-            helper.setText(content, true);
-
-            // Send the email
-            test.send(message);
-            System.out.println("Successful send");
-        } catch (Exception ex) {
-            System.err.println(ex.getMessage());
-        }
-    }
-
-
-
-    private String generateDigitalSignature(String plaintextReturnPayload) {
-
-        try {
-            System.out.println("attempting sign");
-            return signText(plaintextReturnPayload, getPrivateKey());
-        } catch (Exception e) {
-            return "Signature Failed. Contact barzzy.llc@gmail.com immediately | " + java.time.Instant.now();
-        }
-    }
-
-    // Load private key from input or file
-    private static PrivateKey getPrivateKey() throws Exception {
-
-        String keyContent = "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";
-
-
-        keyContent = keyContent.replace("-----BEGIN RSA PRIVATE KEY-----", "")
-                .replace("-----END RSA PRIVATE KEY-----", "")
-                .replaceAll("\\s", "").replaceAll("\n", "");
-
-        byte[] keyBytes = Base64.getDecoder().decode(keyContent);
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        return keyFactory.generatePrivate(keySpec);
-    }
-
-    // Sign text
-    private static String signText(String text, PrivateKey privateKey) throws Exception {
-        Signature signature = Signature.getInstance("SHA256withRSA");
-        signature.initSign(privateKey);
-        signature.update(text.getBytes());
-        byte[] digitalSignature = signature.sign();
-        return Base64.getEncoder().encodeToString(digitalSignature);
-    }
-
+    
 
     private void notifyBartendersOfActiveConnections(int barID) {
         System.out.println("notifyBartendersOfActiveConnections triggered with barID: " + barID);
@@ -1259,7 +958,4 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             }
         }
     }
-    
-   
-
 }
