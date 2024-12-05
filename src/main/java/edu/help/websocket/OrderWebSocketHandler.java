@@ -235,10 +235,10 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                 case "unready":
                     notificationMessage = claimer.isEmpty()
                             ? "Your order has been unclaimed."
-                            : "Station \"" + claimer + "\" has claimed your order!";
+                            : "Worker \"" + claimer + "\" has claimed your order!";
                     break;
                 case "ready":
-                    notificationMessage = "Your order is now ready at station \"" + claimer + "\".";
+                    notificationMessage = "Worker \"" + claimer + "\" has finished your order.";
                     break;
                 case "delivered":
                     notificationMessage = "Order completed! " + (totalQuantity * 75) + " pts have been awarded to your account!";
@@ -324,10 +324,12 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    public void sendArrivedNotification(int userID) {
+    public void sendArrivedNotification(int userID, String claimer) {
         String deviceToken = deviceTokenMap.get(String.valueOf(userID));
         if (deviceToken != null && !deviceToken.isEmpty()) {
-            sendPushNotification(deviceToken, "Your bartender will call your name shortly.");
+            
+            String message = "Worker \"" + claimer + "\" will call your name shortly.";
+            sendPushNotification(deviceToken, message);
         } else {
             System.err.println("No device token found for userId: " + userID);
         }

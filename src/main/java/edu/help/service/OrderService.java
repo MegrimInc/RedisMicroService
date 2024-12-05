@@ -401,7 +401,7 @@ if (totalQuantity > quantityLimit) {
                             existingOrder,
                             "Marked as arrived."));
 
-                    OrderWebSocketHandler.getInstance().sendArrivedNotification(userID);
+                    OrderWebSocketHandler.getInstance().sendArrivedNotification(userID, existingOrder.getClaimer() );
 
 
                     // Broadcast the order to bartenders
