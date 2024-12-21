@@ -1,7 +1,11 @@
 package edu.help.dto;
 
+import jakarta.annotation.Nullable;
+import lombok.Data;
+
 import java.util.List;
 
+@Data
 public class OrderRequest {
     private int barId;
     private int userId;
@@ -9,8 +13,10 @@ public class OrderRequest {
     private List<DrinkOrder> drinks;
     private boolean inAppPayments;
     private boolean happyHour;
-
-
+    @Nullable
+    private String status;
+    @Nullable
+    private String claimer;
 
     @Override
     public String toString() {
@@ -20,58 +26,10 @@ public class OrderRequest {
                 ", tip=" + tip + // Updated toString
                 ", drinks=" + drinks +
                 ", inAppPayments=" + inAppPayments +
-                ", happyHour=" + happyHour + 
+                ", happyHour=" + happyHour +
+                ", status=" + status +
+                ", claimer=" + claimer +
                 '}';
-    }
-
-    // Getters and Setters
-    public int getBarId() {
-        return barId;
-    }
-
-    public void setBarId(int barId) {
-        this.barId = barId;
-    }
-
-    public int getUserId() {
-        return userId;
-    }
-
-    public void setUserId(int userId) {
-        this.userId = userId;
-    }
-
-
-    public double getTip() {
-        return tip;
-    }
-
-    public void setTip(double tip) {
-        this.tip = tip;
-    }
-
-    public List<DrinkOrder> getDrinks() {
-        return drinks;
-    }
-
-    public void setDrinks(List<DrinkOrder> drinks) {
-        this.drinks = drinks;
-    }
-
-    public boolean isInAppPayments() {
-        return inAppPayments;
-    }
-
-    public void setInAppPayments(boolean inAppPayments) {
-        this.inAppPayments = inAppPayments;
-    }
-
-    public boolean isHappyHour() { // Getter for isHappyHour
-        return happyHour;
-    }
-
-    public void setHappyHour(boolean happyHour) { // Setter for isHappyHour
-        this.happyHour = happyHour;
     }
 
     public static class DrinkOrder {

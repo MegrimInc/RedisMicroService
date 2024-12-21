@@ -53,28 +53,25 @@ public class OrderService {
         System.out.println("Processing order for barId: " + orderRequest.getBarId());
 
         // Fetch the total quantity of items ordered
-    int totalQuantity = orderRequest.getDrinks().stream()
-    .mapToInt(OrderRequest.DrinkOrder::getQuantity)
-    .sum();
+        int totalQuantity = orderRequest.getDrinks().stream()
+                .mapToInt(OrderRequest.DrinkOrder::getQuantity)
+                .sum();
 
-// Determine quantity limit based on payment type
-int quantityLimit = orderRequest.isInAppPayments() ? 10 : 3;
+        // Determine quantity limit based on payment type
+        int quantityLimit = orderRequest.isInAppPayments() ? 10 : 3;
 
-// Check if total quantity exceeds the limit
-if (totalQuantity > quantityLimit) {
-    String message = orderRequest.isInAppPayments() 
-        ? "You can only add up to 10 drinks for in-app payment."
-        : "You can only add up to 3 drinks for Pay @ bar option.";
-    
-    System.out.println("Order quantity limit exceeded: " + message);
+        // Check if total quantity exceeds the limit
+        if (totalQuantity > quantityLimit) {
+            String message = orderRequest.isInAppPayments()
+                ? "You can only add up to 10 drinks for in-app payment."
+                : "You can only add up to 3 drinks for Pay @ bar option.";
 
-    // Send error response and exit
-    sendOrderResponse(session, new ResponseWrapper(
-        "error",
-        null,
-        message));
-    return;
-}
+            System.out.println("Order quantity limit exceeded: " + message);
+
+            // Send error response and exit
+            sendOrderResponse(session, new ResponseWrapper("error", null, message));
+            return;
+        }
 
         // Fetch open and happyHour status from Redis
         String barKey = String.valueOf(orderRequest.getBarId());
@@ -146,8 +143,6 @@ if (totalQuantity > quantityLimit) {
         System.out.println(
                 "No existing order in progress or status is 'delivered' or 'canceled'. Proceeding with order processing.");
 
-       
-
         try {
             // Send order request to PostgreSQL
             OrderResponse orderResponse = restTemplate.postForObject(
@@ -156,7 +151,6 @@ if (totalQuantity > quantityLimit) {
                     OrderResponse.class);
 
             if (orderResponse != null) {
-
                 Order order = new Order(
                     orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER ID WITH SOMETHING GENERATED
                     orderRequest.getBarId(),
@@ -165,12 +159,12 @@ if (totalQuantity > quantityLimit) {
                     orderResponse.getTotalPointPrice(),
                     orderResponse.getTip(),
                     orderRequest.isInAppPayments(), // Assuming this is from the request
-                    convertDrinksToOrders(orderResponse.getDrinks()),    
-                    "unready",
-                    "", // Placeholder for claimer
+                    convertDrinksToOrders(orderResponse.getDrinks()),
+                    orderRequest.getStatus() != null ? orderRequest.getStatus() : "unready",
+                    orderRequest.getClaimer() != null ? orderRequest.getClaimer() : "", // Placeholder for claimer
                     getCurrentTimestamp(),
                     session.getId()
-            );
+                );
 
                 if (!"broke".equals(orderResponse.getMessageType())) {
 
@@ -202,7 +196,6 @@ if (totalQuantity > quantityLimit) {
                             orderResponse.getMessage()));
                 }
             }
-
         } catch (RestClientException e) {
             e.printStackTrace();
             sendOrderResponse(session, new ResponseWrapper(
