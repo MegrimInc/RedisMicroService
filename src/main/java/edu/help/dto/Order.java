@@ -8,11 +8,11 @@ public class Order {
     private String sessionId, name, status, claimer, timestamp ; //TODO WESLEY change to string and refactor
     private int barId, userId, totalPointPrice;
     private double totalRegularPrice, tip;
-    private boolean inAppPayments;
+    private boolean inAppPayments, pointOfSale;
     private List<DrinkOrder> drinks;
 
     public Order(String name, int barId, int userId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
-            List<DrinkOrder> drinks, String status, String claimer, String timestamp, String sessionId) {
+            List<DrinkOrder> drinks, boolean pointOfSale, String status, String claimer, String timestamp, String sessionId) {
         this.name = name;
         this.barId = barId;
         this.userId = userId;
@@ -21,6 +21,7 @@ public class Order {
         this.tip = tip; 
         this.inAppPayments = inAppPayments;
         this.drinks = drinks;
+        this.pointOfSale = pointOfSale;
         this.status = status;
         this.claimer = claimer;
         this.timestamp = timestamp;
@@ -108,6 +109,16 @@ public class Order {
     @JsonProperty("drinks")
     public void setDrinks(List<DrinkOrder> drinks) {
         this.drinks = drinks;
+    }
+
+    @JsonProperty("pointOfSale")
+    public boolean isPointOfSale() {
+        return pointOfSale;
+    }
+
+    @JsonProperty("pointOfSale")
+    public void setPointOfSale(boolean pointOfSale) {
+        this.pointOfSale = pointOfSale;
     }
 
     @JsonProperty("status")

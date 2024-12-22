@@ -166,6 +166,7 @@ public class OrderService {
                     orderResponse.getTip(),
                     orderRequest.isInAppPayments(), // Assuming this is from the request
                     convertDrinksToOrders(orderResponse.getDrinks()),
+                    orderRequest.getPointOfSale() != null ? orderRequest.getPointOfSale() : false,
                     status,
                     orderRequest.getClaimer() != null ? orderRequest.getClaimer() : "", // Placeholder for claimer
                     getCurrentTimestamp(),
