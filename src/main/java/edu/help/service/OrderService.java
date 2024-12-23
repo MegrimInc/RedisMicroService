@@ -151,11 +151,14 @@ public class OrderService {
                     OrderResponse.class);
 
             if (orderResponse != null) {
-                String status;
-                if (orderRequest.getPointOfSale() == null || !orderRequest.getPointOfSale())
-                    status = "unready";
-                else
+                String status = "unready";
+                String claimer = "";
+                boolean pointOfSale = false;
+                if (orderRequest.getClaimer() != null && !orderRequest.getClaimer().isEmpty()) {
                     status = "here";
+                    claimer = orderRequest.getClaimer();
+                    pointOfSale = true;
+                }
 
                 Order order = new Order(
                     orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER ID WITH SOMETHING GENERATED
@@ -166,9 +169,9 @@ public class OrderService {
                     orderResponse.getTip(),
                     orderRequest.isInAppPayments(), // Assuming this is from the request
                     convertDrinksToOrders(orderResponse.getDrinks()),
-                    orderRequest.getPointOfSale() != null ? orderRequest.getPointOfSale() : false,
+                    pointOfSale,
                     status,
-                    orderRequest.getClaimer() != null ? orderRequest.getClaimer() : "", // Placeholder for claimer
+                    claimer,
                     getCurrentTimestamp(),
                     session.getId()
                 );

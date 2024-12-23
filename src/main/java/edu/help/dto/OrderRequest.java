@@ -14,8 +14,6 @@ public class OrderRequest {
     private boolean inAppPayments;
     private boolean happyHour;
     @Nullable
-    private Boolean pointOfSale;
-    @Nullable
     private String claimer;
 
     @Override
@@ -27,7 +25,6 @@ public class OrderRequest {
                 ", drinks=" + drinks +
                 ", inAppPayments=" + inAppPayments +
                 ", happyHour=" + happyHour +
-                ", pointOfSale=" + pointOfSale +
                 ", claimer=" + claimer +
                 '}';
     }
