@@ -155,7 +155,7 @@ public class OrderService {
                 String claimer = "";
                 boolean pointOfSale = false;
                 if (orderRequest.getClaimer() != null && !orderRequest.getClaimer().isEmpty()) {
-                    status = "here";
+                    status = "arrived";
                     claimer = orderRequest.getClaimer();
                     pointOfSale = true;
                 }
