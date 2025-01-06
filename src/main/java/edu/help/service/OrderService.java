@@ -186,7 +186,7 @@ public class OrderService {
                             order,
                             "Order successfully processed."));
                             
-                    OrderWebSocketHandler.getInstance().sendCreateNotification(orderRequest);
+                    //OrderWebSocketHandler.getInstance().sendCreateNotification(orderRequest);
 
                     // Broadcast the order to bartenders
                     Map<String, Object> data = new HashMap<>();

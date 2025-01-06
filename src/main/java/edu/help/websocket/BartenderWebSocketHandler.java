@@ -2,6 +2,7 @@ package edu.help.websocket;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -405,11 +406,13 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
         restTemplate.postForLocation(
                 "http://34.230.32.169:8080/orders/save",
                 order
-            );
+        );
+            
 
-        // Broadcast the updated order to all bartenders
-        Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-        broadcastToBar(barID, orderData);
+        Map<String, Object> data = new HashMap<>();
+            data.put("orders", Collections.singletonList(order));
+
+            broadcastToBar(barID, data);
 
         orderWebSocketHandler.updateUser(order);
     }
@@ -471,9 +474,10 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
                     order
             );
 
-            // Broadcast the updated order to all bartenders
-            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-            broadcastToBar(barID, orderData);
+            Map<String, Object> data = new HashMap<>();
+            data.put("orders", Collections.singletonList(order));
+
+            broadcastToBar(barID, data);
 
         orderWebSocketHandler.updateUser(order);
     }
@@ -551,9 +555,10 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
                 return;
             }
 
-            // Broadcast the updated order to all bartenders
-            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-            broadcastToBar(barID, orderData);
+            Map<String, Object> data = new HashMap<>();
+            data.put("orders", Collections.singletonList(order));
+                    
+            broadcastToBar(barID, data);
 
             orderWebSocketHandler.updateUser(order);
 
@@ -630,9 +635,10 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
                 return;
             }
 
-            // Broadcast the updated order to all bartenders
-            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-            broadcastToBar(barID, orderData);
+            Map<String, Object> data = new HashMap<>();
+            data.put("orders", Collections.singletonList(order));
+
+            broadcastToBar(barID, data);
 
             orderWebSocketHandler.updateUser(order);
         }
@@ -699,9 +705,10 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
                 return;
             }
 
-            // Broadcast the updated order to all bartenders
-            Map<String, Object> orderData = objectMapper.convertValue(order, Map.class);
-            broadcastToBar(barID, orderData);
+            Map<String, Object> data = new HashMap<>();
+            data.put("orders", Collections.singletonList(order));
+
+            broadcastToBar(barID, data);
 
             orderWebSocketHandler.updateUser(order);
         }
@@ -871,33 +878,17 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             String barStatus = jedis.hget(String.valueOf(barID), "open");
 
             if (barStatus != null) {
-                boolean barStatus1 = barStatus.equals("true");
+                boolean status = barStatus.equals("true");
 
-                JSONObject happyHourMessage = new JSONObject();
-                happyHourMessage.put("barStatus", barStatus1);
+                JSONObject openOrClosed = new JSONObject();
+                openOrClosed.put("barStatus", status);
 
-                session.sendMessage(new TextMessage(happyHourMessage.toString()));
+                session.sendMessage(new TextMessage(openOrClosed.toString()));
                 System.out.println("Sent bar status to session: " + session.getId());
             } else {
                 // Send an error or default status if happy hour status is not found
                 sendErrorMessage(session, "Failed to retrieve bar status.");
             }
-
-            String happyHourStatus = jedis.hget(String.valueOf(barID), "happyHour");
-
-            if (happyHourStatus != null) {
-                boolean isHappyHour = happyHourStatus.equals("true");
-
-                JSONObject happyHourMessage = new JSONObject();
-                happyHourMessage.put("happyHour", isHappyHour);
-
-                session.sendMessage(new TextMessage(happyHourMessage.toString()));
-                System.out.println("Sent happy hour status to session: " + session.getId());
-            } else {
-                // Send an error or default status if happy hour status is not found
-                sendErrorMessage(session, "Failed to retrieve happy hour status.");
-            }
-
 
 
         } catch (Exception e) {

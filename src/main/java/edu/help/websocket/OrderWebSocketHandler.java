@@ -312,17 +312,17 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    public void sendCreateNotification(OrderRequest orderRequest) {
-        String message = "Your order has been placed!";
+    // public void sendCreateNotification(OrderRequest orderRequest) {
+    //     String message = "Your order has been placed!";
 
-        // Retrieve device token
-        String deviceToken = deviceTokenMap.get(String.valueOf(orderRequest.getUserId()));
-        if (deviceToken != null && !deviceToken.isEmpty()) {
-            sendPushNotification(deviceToken, message);
-        } else {
-            System.err.println("No device token found for userId: " + orderRequest.getUserId());
-        }
-    }
+    //     // Retrieve device token
+    //     String deviceToken = deviceTokenMap.get(String.valueOf(orderRequest.getUserId()));
+    //     if (deviceToken != null && !deviceToken.isEmpty()) {
+    //         sendPushNotification(deviceToken, message);
+    //     } else {
+    //         System.err.println("No device token found for userId: " + orderRequest.getUserId());
+    //     }
+    // }
 
     public void sendArrivedNotification(int userID, String claimer) {
         String deviceToken = deviceTokenMap.get(String.valueOf(userID));
