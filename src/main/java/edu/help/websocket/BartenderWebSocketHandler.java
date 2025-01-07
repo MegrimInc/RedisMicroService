@@ -41,6 +41,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
     private final OrderWebSocketHandler orderWebSocketHandler;
     private final RestTemplate restTemplate;
 
+
     public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool,
             OrderWebSocketHandler orderWebSocketHandler, RestTemplate restTemplate) {
         this.jedisPooled = jedisPooled;
@@ -410,7 +411,7 @@ public class BartenderWebSocketHandler extends TextWebSocketHandler {
             
 
         Map<String, Object> data = new HashMap<>();
-            data.put("orders", Collections.singletonList(order));
+            data.put("update", Collections.singletonList(order));
 
             broadcastToBar(barID, data);
 
@@ -475,7 +476,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             );
 
             Map<String, Object> data = new HashMap<>();
-            data.put("orders", Collections.singletonList(order));
+            data.put("update", Collections.singletonList(order));
 
             broadcastToBar(barID, data);
 
@@ -556,7 +557,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             }
 
             Map<String, Object> data = new HashMap<>();
-            data.put("orders", Collections.singletonList(order));
+            data.put("update", Collections.singletonList(order));
                     
             broadcastToBar(barID, data);
 
@@ -636,7 +637,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             }
 
             Map<String, Object> data = new HashMap<>();
-            data.put("orders", Collections.singletonList(order));
+            data.put("update", Collections.singletonList(order));
 
             broadcastToBar(barID, data);
 
@@ -706,7 +707,7 @@ public void handleCancelAction(WebSocketSession session, Map<String, Object> pay
             }
 
             Map<String, Object> data = new HashMap<>();
-            data.put("orders", Collections.singletonList(order));
+            data.put("update", Collections.singletonList(order));
 
             broadcastToBar(barID, data);
 
