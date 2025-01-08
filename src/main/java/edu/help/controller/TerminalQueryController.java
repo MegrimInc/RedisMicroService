@@ -1,24 +1,28 @@
 package edu.help.controller;
 
-import edu.help.dto.BartenderSession;
-import org.springframework.web.bind.annotation.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import edu.help.dto.BartenderSession;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-
 // Could also be @RestController, which automatically adds @ResponseBody
 @RestController
-@RequestMapping("/http")
+@RequestMapping("/ws/http")
 public class TerminalQueryController {
 
     private final JedisPooled jedisPooled;
@@ -33,7 +37,7 @@ public class TerminalQueryController {
     }
 
     /**
-     * Example GET endpoint:  https://www.barzzy.site/http/checkTerminals?barID=123
+     * Example GET endpoint:  https://www.barzzy.site/ws/http/checkTerminals?barID=123
      *
      * Returns a string containing the list of active terminals, e.g. "AB", or "" if none.
      */
@@ -50,23 +54,6 @@ public class TerminalQueryController {
         }
     }
 
-    /**
-     * Example POST endpoint if you prefer POST:
-     *   https://www.barzzy.site/http/checkTerminals
-     * with body form-data or JSON containing barID
-     */
-    @PostMapping("/checkTerminals")
-    public ResponseEntity<String> checkTerminalsPOST(@RequestParam("barID") int barId) {
-        try {
-            // Same logic as GET
-            String activeTerminals = getActiveTerminals(barId);
-            return ResponseEntity.ok(activeTerminals);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError()
-                    .body("Error checking terminals: " + e.getMessage());
-        }
-    }
 
     /**
      * The main logic that scans Redis for <barId>.<bartenderID> keys,
