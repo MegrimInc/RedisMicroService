@@ -176,7 +176,7 @@ public class OrderService {
                     session.getId()
                 );
 
-                if (!"broke".equals(orderResponse.getMessageType())) {
+                if (!"error".equals(orderResponse.getMessageType())) {
 
                     jedisPooled.jsonSetWithEscape(orderKey, order);
                     System.out.println("Stored order in Redis with key: " + orderKey);
@@ -201,7 +201,7 @@ public class OrderService {
                     // Handle insufficient points or other errors
                     System.out.println("Order failed: " + orderResponse.getMessage());
                     sendOrderResponse(session, new ResponseWrapper(
-                            "broke",
+                            "error",
                             order,
                             orderResponse.getMessage()));
                 }
