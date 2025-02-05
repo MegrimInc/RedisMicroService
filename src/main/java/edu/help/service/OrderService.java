@@ -58,14 +58,12 @@ public class OrderService {
                 .sum();
 
         // Determine quantity limit based on payment type
-        int quantityLimit = orderRequest.isInAppPayments() ? 10 : 3;
+        int quantityLimit = 10;
 
         // Check if total quantity exceeds the limit
         if (totalQuantity > quantityLimit) {
-            String message = orderRequest.isInAppPayments()
-                ? "You can only add up to 10 drinks for in-app payment."
-                : "You can only add up to 3 drinks for Pay @ bar option.";
-
+            String message = "You can only add up to 10 drinks per order";
+     
             System.out.println("Order quantity limit exceeded: " + message);
 
             // Send error response and exit
