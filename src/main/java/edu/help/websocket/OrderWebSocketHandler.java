@@ -198,13 +198,11 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         String status = order.getStatus(); // Get the order status
         String claimer = order.getClaimer() != null ? order.getClaimer() : ""; // Default to empty if null
         String sessionId = order.getSessionId(); // Retrieve session ID from the order
-        Boolean inAppPayments = order.isInAppPayments(); // Retrieve inApp bool from the order
         int userId = order.getUserId(); // Retrieve user ID
         String deviceToken = deviceTokenMap.get(String.valueOf(userId)); // Lookup device token using userId
-        // Calculate total quantity of drinks from the Order object
-        int totalQuantity = order.getDrinks().stream()
-            .mapToInt(Order.DrinkOrder::getQuantity)
-            .sum();
+        double totalPrice = order.getTotalRegularPrice();
+        int pointsAwarded = (int) Math.round(totalPrice * 10 * 1.20);
+       
     
         // Retrieve the WebSocket session from the sessionMap using the sessionId
         WebSocketSession userSession = sessionMap.get(sessionId);
@@ -240,15 +238,19 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                 case "ready":
                     notificationMessage = "Worker \"" + claimer + "\" has finished your order.";
                     break;
-                case "delivered":
-                    notificationMessage = "Order completed! " + (totalQuantity * 75) + " pts have been awarded to your account!";
+                    case "delivered":
+                    if (totalPrice > 0) {
+                        notificationMessage = "Order completed! " + pointsAwarded + " pts have been awarded to your account!";
+                    } else {
+                        notificationMessage = "Your order has been completed.";
+                    }
                     break;
                 case "canceled":
-                if (inAppPayments) {
-                    notificationMessage = "Order canceled! " + (totalQuantity * 75) + " pts will still be awarded to your account!";
-                } else {
-                    notificationMessage = "Order canceled! No points will be awarded to your account!";
-                }
+                    if (totalPrice > 0) {
+                        notificationMessage = "Order canceled! " + pointsAwarded + " pts will still be awarded to your account!";
+                    } else {
+                        notificationMessage = "Your order has been canceled.";
+                    }
                     break;
                 default:
                     System.err.println("Unknown order status: " + status);
