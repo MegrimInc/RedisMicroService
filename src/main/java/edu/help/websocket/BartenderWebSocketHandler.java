@@ -41,7 +41,6 @@
         private final OrderWebSocketHandler orderWebSocketHandler;
         private final RestTemplate restTemplate;
 
-
         public BartenderWebSocketHandler(JedisPooled jedisPooled, JedisPool jedisPool,
                 OrderWebSocketHandler orderWebSocketHandler, RestTemplate restTemplate) {
             this.jedisPooled = jedisPooled;
@@ -51,7 +50,6 @@
             this.restTemplate = restTemplate;
 
         }
-
 
         public static BartenderWebSocketHandler getInstance() {
             return instance;
@@ -64,7 +62,6 @@
                 String payload = message.getPayload();
                 System.out.println("Bartender WebSocket message received: " + payload);
 
-
                 // Parse the JSON message
                 Map<String, Object> payloadMap = objectMapper.readValue(payload, Map.class);
 
@@ -74,6 +71,10 @@
                 // Handle the action based on its value
                 System.out.println("Action received:" + action);
                 switch (action) {
+                    case "ping":
+                        handlePingAction(session, payloadMap);
+                        break;
+
                     case "initialize":
                         handleInitializeAction(session, payloadMap);
                         break;
@@ -108,7 +109,7 @@
 
                     case "open":
                         int barID = (int) payloadMap.get("barID");
-                        String barKey = String.valueOf(barID);  // Adjust this to match your specific key format
+                        String barKey = String.valueOf(barID); // Adjust this to match your specific key format
 
                         try (Jedis jedis = jedisPool.getResource()) {
                             jedis.watch(barKey);
@@ -146,7 +147,7 @@
 
                     case "close":
                         int barID2 = (int) payloadMap.get("barID");
-                        String barKey2 = String.valueOf(barID2);  // Adjust this to match your specific key format
+                        String barKey2 = String.valueOf(barID2); // Adjust this to match your specific key format
 
                         try (Jedis jedis = jedisPool.getResource()) {
                             jedis.watch(barKey2);
@@ -180,8 +181,6 @@
                         }
                         break;
 
-
-
                     default:
                         sendErrorMessage(session, "Unknown action: " + action);
                         break;
@@ -192,8 +191,11 @@
             }
         }
 
-
-
+        private void handlePingAction(WebSocketSession session, Map<String, Object> payload) throws IOException {
+            JSONObject response = new JSONObject();
+            response.put("heartbeat", "pong");
+            session.sendMessage(new TextMessage(response.toString()));
+        }
 
         private void notifyBartendersOfActiveConnections(int barID) {
             System.out.println("notifyBartendersOfActiveConnections triggered with barID: " + barID);
@@ -261,7 +263,8 @@
                         wsSession.sendMessage(new TextMessage(jsonMessage));
                     } else {
                         System.out.println(
-                                "WebSocket session is closed or null for bartender: " + bartenderSession.getBartenderId());
+                                "WebSocket session is closed or null for bartender: "
+                                        + bartenderSession.getBartenderId());
                     }
                 }
             } catch (Exception e) {
@@ -270,8 +273,6 @@
                 e.printStackTrace();
             }
         }
-
-
 
         @Transactional
         public void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
@@ -344,87 +345,84 @@
                 notifyBartendersOfActiveConnections(barID);
                 handleRefreshAction(session, payload);
 
-
             }
         }
 
         @Transactional
         public void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-        int barID = (int) payload.get("barID");
-        int userID = (int) payload.get("userID");
-        String bartenderID = (String) payload.get("bartenderID");
+            int barID = (int) payload.get("barID");
+            int userID = (int) payload.get("userID");
+            String bartenderID = (String) payload.get("bartenderID");
 
-        String orderRedisKey = barID + "." + userID;
+            String orderRedisKey = barID + "." + userID;
 
-        try (Jedis jedis = jedisPool.getResource()) {
-            jedis.watch(orderRedisKey); // Watch the key for changes
+            try (Jedis jedis = jedisPool.getResource()) {
+                jedis.watch(orderRedisKey); // Watch the key for changes
 
-            // Retrieve the JSON object from Redis
-            Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
+                // Retrieve the JSON object from Redis
+                Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
 
-            if (orderJsonObj == null) {
-                sendErrorMessage(session, "Order does not exist.");
-                jedis.unwatch(); // Unwatch if the order doesn't exist
-                return;
-            }
+                if (orderJsonObj == null) {
+                    sendErrorMessage(session, "Order does not exist.");
+                    jedis.unwatch(); // Unwatch if the order doesn't exist
+                    return;
+                }
 
-            // Convert the retrieved Object to a JSON string
-            String orderJson = objectMapper.writeValueAsString(orderJsonObj);
+                // Convert the retrieved Object to a JSON string
+                String orderJson = objectMapper.writeValueAsString(orderJsonObj);
 
-            // Deserialize the JSON string into an Order object
-            Order order = objectMapper.readValue(orderJson, Order.class);
+                // Deserialize the JSON string into an Order object
+                Order order = objectMapper.readValue(orderJson, Order.class);
 
-            String currentClaimer = order.getClaimer();
+                String currentClaimer = order.getClaimer();
 
-            if (!bartenderID.equals(currentClaimer)) {
-                sendErrorMessage(session, "You cannot deliver this order because it was claimed by another bartender.");
-                jedis.unwatch(); // Unwatch if the order was claimed by another bartender
-                return;
-            }
+                if (!bartenderID.equals(currentClaimer)) {
+                    sendErrorMessage(session,
+                            "You cannot deliver this order because it was claimed by another bartender.");
+                    jedis.unwatch(); // Unwatch if the order was claimed by another bartender
+                    return;
+                }
 
-            String currentStatus = order.getStatus();
+                String currentStatus = order.getStatus();
 
-            if (!"ready".equals(currentStatus) && !"arrived".equals(currentStatus)) {
-                sendErrorMessage(session, "Only ready or arrived orders can be marked as delivered.");
-                jedis.unwatch(); // Unwatch if the order is not ready
-                return;
-            }
+                if (!"ready".equals(currentStatus) && !"arrived".equals(currentStatus)) {
+                    sendErrorMessage(session, "Only ready or arrived orders can be marked as delivered.");
+                    jedis.unwatch(); // Unwatch if the order is not ready
+                    return;
+                }
 
-            // Update the order to set status to "delivered"
-            order.setStatus("delivered");
+                // Update the order to set status to "delivered"
+                order.setStatus("delivered");
 
-            Transaction transaction = jedis.multi(); // Start the transaction
-            String updatedOrderJson = objectMapper.writeValueAsString(order);
-            transaction.jsonSet(orderRedisKey, updatedOrderJson);
-            List<Object> results = transaction.exec(); // Execute the transaction
+                Transaction transaction = jedis.multi(); // Start the transaction
+                String updatedOrderJson = objectMapper.writeValueAsString(order);
+                transaction.jsonSet(orderRedisKey, updatedOrderJson);
+                List<Object> results = transaction.exec(); // Execute the transaction
 
-            if (results == null || results.isEmpty()) {
-                sendErrorMessage(session, "Failed to deliver the order due to a conflict. Please try again.");
-                return;
-            }
+                if (results == null || results.isEmpty()) {
+                    sendErrorMessage(session, "Failed to deliver the order due to a conflict. Please try again.");
+                    return;
+                }
 
-            // Send the order to PostgreSQL
-            restTemplate.postForLocation(
-                    "http://34.230.32.169:8080/orders/save",
-                    order
-            );
+                // Send the order to PostgreSQL
+                restTemplate.postForLocation(
+                        "http://34.230.32.169:8080/orders/save",
+                        order);
 
-
-            Map<String, Object> data = new HashMap<>();
+                Map<String, Object> data = new HashMap<>();
                 data.put("update", Collections.singletonList(order));
 
                 broadcastToBar(barID, data);
 
-            orderWebSocketHandler.updateUser(order);
+                orderWebSocketHandler.updateUser(order);
+            }
         }
-    }
 
-
-    @Transactional
-    public void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-        int barID = (int) payload.get("barID");
-        int userID = (int) payload.get("userID");
-        String cancelingBartenderID = (String) payload.get("bartenderID");
+        @Transactional
+        public void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
+            int barID = (int) payload.get("barID");
+            int userID = (int) payload.get("userID");
+            String cancelingBartenderID = (String) payload.get("bartenderID");
 
             String orderRedisKey = barID + "." + userID;
 
@@ -472,18 +470,16 @@
                 // Send the order to PostgreSQL
                 restTemplate.postForLocation(
                         "http://34.230.32.169:8080/orders/save",
-                        order
-                );
+                        order);
 
                 Map<String, Object> data = new HashMap<>();
                 data.put("update", Collections.singletonList(order));
 
                 broadcastToBar(barID, data);
 
-            orderWebSocketHandler.updateUser(order);
+                orderWebSocketHandler.updateUser(order);
+            }
         }
-    }
-
 
         @Transactional
         public void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
@@ -688,7 +684,8 @@
                 String currentClaimer = order.getClaimer();
 
                 if (!unclaimingBartenderID.equals(currentClaimer)) {
-                    sendErrorMessage(session, "You cannot unclaim this order because it was claimed by another bartender.");
+                    sendErrorMessage(session,
+                            "You cannot unclaim this order because it was claimed by another bartender.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another bartender
                     return;
                 }
@@ -722,7 +719,8 @@
 
             if (bartenderID == null || bartenderID.isEmpty() || !bartenderID.matches("[a-zA-Z]+")) {
                 // Send an error response
-                sendErrorMessage(session, "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
+                sendErrorMessage(session,
+                        "Invalid bartenderID. It must be non-empty and contain only alphabetic characters.");
                 return;
             }
 
@@ -786,14 +784,11 @@
             }
         }
 
-
         private void sendErrorMessage(WebSocketSession session, String errorMessage) throws IOException {
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", errorMessage);
             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
         }
-
-
 
         @Transactional
         public void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
@@ -824,7 +819,7 @@
                     // Process each key, but only if it matches the format barId.# (where # is a number)
                     for (String key : keys) {
                         // Match the format barId.# and ensure the part after the dot is entirely numeric
-                        if (key.matches(barID + "\\.\\d+")) {  // This regex matches barID.# where # is one or more digits
+                        if (key.matches(barID + "\\.\\d+")) { // This regex matches barID.# where # is one or more digits
                             try {
                                 // Retrieve the JSON object from Redis
                                 Object orderJsonObj = jedisPooled.jsonGet(key);
@@ -844,7 +839,8 @@
                                     System.out.println("Skipping session-related data for key ID: " + key);
                                 }
                             } catch (JedisDataException e) {
-                                System.err.println("Encountered JedisDataException for key: " + key + " - " + e.getMessage());
+                                System.err.println(
+                                        "Encountered JedisDataException for key: " + key + " - " + e.getMessage());
                                 // Optionally handle recovery or cleanup here
                             }
                         } else {
@@ -891,13 +887,10 @@
                     sendErrorMessage(session, "Failed to retrieve bar status.");
                 }
 
-
             } catch (Exception e) {
                 e.printStackTrace(); // Handle exceptions
                 sendErrorMessage(session, "Error retrieving orders");
             }
-
-
 
         }
 
