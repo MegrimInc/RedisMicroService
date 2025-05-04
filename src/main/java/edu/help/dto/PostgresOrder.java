@@ -22,8 +22,8 @@ public class PostgresOrder {
     private double tip; // Tip amount given by the user for the order
     private boolean inAppPayments; // Indicates if the payment was made in-app
     private String status; // Final status of the order ('claimed', 'delivered', 'canceled')
-    private String station; // Station station identifier (A-Z)
-    private String tipsClaimed; // "NULL" (as a string) if not claimed, or the station's name
+    private String terminal; // Terminal terminal identifier (A-Z)
+    private String tipsClaimed; // "NULL" (as a string) if not claimed, or the terminal's name
 
     @Data
     @NoArgsConstructor

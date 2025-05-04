@@ -23,7 +23,7 @@ import edu.help.dto.Order;
 import edu.help.dto.OrderRequest;
 import edu.help.dto.OrderResponse;
 import edu.help.dto.ResponseWrapper;
-import edu.help.websocket.StationWebSocketHandler;
+import edu.help.websocket.TerminalWebSocketHandler;
 import edu.help.websocket.OrderWebSocketHandler;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
@@ -184,12 +184,12 @@ public class OrderService {
                             
                     //OrderWebSocketHandler.getInstance().sendCreateNotification(orderRequest);
 
-                    // Broadcast the order to stations
+                    // Broadcast the order to terminals
                     Map<String, Object> data = new HashMap<>();
                     data.put("orders", Collections.singletonList(order));
                     try {
-                        StationWebSocketHandler.getInstance().broadcastToMerchant(orderRequest.getMerchantId(), data);
-                        System.out.println("Sent order to station");
+                        TerminalWebSocketHandler.getInstance().broadcastToMerchant(orderRequest.getMerchantId(), data);
+                        System.out.println("Sent order to terminal");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -403,12 +403,12 @@ public class OrderService {
                     OrderWebSocketHandler.getInstance().sendArrivedNotification(userID, existingOrder.getClaimer() );
 
 
-                    // Broadcast the order to stations
+                    // Broadcast the order to terminals
                     Map<String, Object> data = new HashMap<>();
                     data.put("orders", Collections.singletonList(existingOrder));
                     try {
-                        StationWebSocketHandler.getInstance().broadcastToMerchant(existingOrder.getMerchantId(), data);
-                        System.out.println("Notified Stations that person is arrived");
+                        TerminalWebSocketHandler.getInstance().broadcastToMerchant(existingOrder.getMerchantId(), data);
+                        System.out.println("Notified Terminals that person is arrived");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }

@@ -2,20 +2,20 @@ package edu.help.dto;
 
 import java.io.Serializable;
 
-public class StationSession implements Serializable {
+public class TerminalSession implements Serializable {
     private int merchantId;
-    private String stationId;
+    private String terminalId;
     private String sessionId;
     private boolean active;
 
     // Default constructor
-    public StationSession() {
+    public TerminalSession() {
     }
 
     // Constructor with parameters
-    public StationSession(int merchantId, String stationId, String sessionId, boolean active) {
+    public TerminalSession(int merchantId, String terminalId, String sessionId, boolean active) {
         this.merchantId = merchantId;
-        this.stationId = stationId;
+        this.terminalId = terminalId;
         this.sessionId = sessionId;
         this.active = active;
     }
@@ -29,12 +29,12 @@ public class StationSession implements Serializable {
         this.merchantId = merchantId;
     }
 
-    public String getStationId() {
-        return stationId;
+    public String getTerminalId() {
+        return terminalId;
     }
 
-    public void setStationId(String stationId) {
-        this.stationId = stationId;
+    public void setTerminalId(String terminalId) {
+        this.terminalId = terminalId;
     }
 
     public String getSessionId() {
@@ -55,9 +55,9 @@ public class StationSession implements Serializable {
 
     @Override
     public String toString() {
-        return "StationSession{" +
+        return "TerminalSession{" +
                 "merchantId=" + merchantId +
-                ", stationId='" + stationId + '\'' +
+                ", terminalId='" + terminalId + '\'' +
                 ", sessionId='" + sessionId + '\'' +
                 ", active=" + active +
                 '}';

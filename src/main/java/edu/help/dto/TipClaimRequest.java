@@ -5,14 +5,14 @@ import lombok.Data;
 @Data
 public class TipClaimRequest {
     private int merchantId;
-    private String stationName;
-    private String stationEmail; // Optional
-    private String station;        // Station's station identifier
+    private String terminalName;
+    private String terminalEmail; // Optional
+    private String terminal;        // Terminal's terminal identifier
 
-    public TipClaimRequest(int merchantID, String stationName, String stationEmail1, String station) {
+    public TipClaimRequest(int merchantID, String terminalName, String terminalEmail1, String terminal) {
         this.merchantId = merchantID;
-        this.stationName = stationName;
-        this.stationEmail = stationEmail1;
-        this.station = station;
+        this.terminalName = terminalName;
+        this.terminalEmail = terminalEmail1;
+        this.terminal = terminal;
     }
 }

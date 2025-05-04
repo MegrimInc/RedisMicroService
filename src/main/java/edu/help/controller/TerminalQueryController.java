@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import edu.help.dto.StationSession;
+import edu.help.dto.TerminalSession;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
@@ -56,14 +56,14 @@ public class TerminalQueryController {
 
 
     /**
-     * The main logic that scans Redis for <merchantId>.<stationID> keys,
-     * deserializes them into StationSession objects, and
+     * The main logic that scans Redis for <merchantId>.<terminalID> keys,
+     * deserializes them into TerminalSession objects, and
      * collects the ones that are 'active'.
      */
     private String getActiveTerminals(int merchantId) throws Exception {
         // Example pattern: "123.[a-zA-Z]*" for merchantId=123
         String pattern = merchantId + ".[a-zA-Z]*";
-        List<String> activeStations = new ArrayList<>();
+        List<String> activeTerminals = new ArrayList<>();
 
         try (Jedis jedis = jedisPool.getResource()) {
             // We'll scan Redis for keys matching the pattern
@@ -76,29 +76,29 @@ public class TerminalQueryController {
                 List<String> matchedKeys = scanResult.getResult();
 
                 for (String key : matchedKeys) {
-                    // Attempt to retrieve the StationSession from Redis
-                    StationSession stationSession = null;
+                    // Attempt to retrieve the TerminalSession from Redis
+                    TerminalSession terminalSession = null;
                     try {
-                        stationSession = jedisPooled.jsonGet(key, StationSession.class);
+                        terminalSession = jedisPooled.jsonGet(key, TerminalSession.class);
                     } catch (Exception e) {
                         // if deserialization fails, skip
                         continue;
                     }
                     // If we got a session and it's active, add it to our list
-                    if (stationSession != null && stationSession.getActive()) {
-                        // The stationID portion is whatever comes after the dot
-                        // but we can also read from stationSession.getStationId()
-                        activeStations.add(stationSession.getStationId());
+                    if (terminalSession != null && terminalSession.getActive()) {
+                        // The terminalID portion is whatever comes after the dot
+                        // but we can also read from terminalSession.getTerminalId()
+                        activeTerminals.add(terminalSession.getTerminalId());
                     }
                 }
             } while (!"0".equals(cursor));
         }
 
-        // If we have multiple stations, say [A, B], we want "AB"
+        // If we have multiple terminals, say [A, B], we want "AB"
         // Sorting them alphabetically can be helpful to keep it deterministic:
-        Collections.sort(activeStations);
+        Collections.sort(activeTerminals);
 
         // Join them with no delimiter to produce a string "AB"
-        return String.join("", activeStations);
+        return String.join("", activeTerminals);
     }
 }
