@@ -138,8 +138,8 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                     break;
                 case "arrive":
                     int userId = (int) payloadMap.get("userId");
-                    int barId = (int) payloadMap.get("barId");
-                    orderService.arriveOrder( session, barId, userId);
+                    int merchantId = (int) payloadMap.get("merchantId");
+                    orderService.arriveOrder( session, merchantId, userId);
                    
                     break;
                 case "refresh":
@@ -286,7 +286,7 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             // Create the push notification
             SimpleApnsPushNotification pushNotification = new SimpleApnsPushNotification(
                     sanitizedToken,
-                    "com.example.barzzyApp9", // Replace with your app's bundle ID
+                    "com.example.megrimApp9", // Replace with your app's bundle ID
                     payload);
 
             // Use PushNotificationFuture for handling notification responses

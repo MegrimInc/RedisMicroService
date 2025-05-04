@@ -7,7 +7,7 @@ import java.util.List;
 
 @Data
 public class OrderRequest {
-    private int barId;
+    private int merchantId;
     private int userId;
     private double tip; // Renamed field
     private List<DrinkOrder> drinks;
@@ -19,7 +19,7 @@ public class OrderRequest {
     @Override
     public String toString() {
         return "OrderRequest{" +
-                "barId=" + barId +
+                "merchantId=" + merchantId +
                 ", userId=" + userId +
                 ", tip=" + tip + // Updated toString
                 ", drinks=" + drinks +

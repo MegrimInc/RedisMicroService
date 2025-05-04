@@ -3,18 +3,18 @@ package edu.help.dto;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-//This is the same as https://github.com/BarzzyLLC/frontend/blob/0.0.0/lib/backend/customerorder2.dart
+//This is the same as https://github.com/MegrimLLC/frontend/blob/0.0.0/lib/backend/customerorder2.dart
 public class Order {
     private String sessionId, name, status, claimer, timestamp ; //TODO WESLEY change to string and refactor
-    private int barId, userId, totalPointPrice;
+    private int merchantId, userId, totalPointPrice;
     private double totalRegularPrice, tip;
     private boolean inAppPayments, pointOfSale;
     private List<DrinkOrder> drinks;
 
-    public Order(String name, int barId, int userId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
+    public Order(String name, int merchantId, int userId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
             List<DrinkOrder> drinks, boolean pointOfSale, String status, String claimer, String timestamp, String sessionId) {
         this.name = name;
-        this.barId = barId;
+        this.merchantId = merchantId;
         this.userId = userId;
         this.totalRegularPrice = totalRegularPrice;
         this.totalPointPrice = totalPointPrice; 
@@ -35,7 +35,7 @@ public class Order {
     public String toString() {
         return "Order{" +
                 "name=" + name +
-                "barId=" + barId +
+                "merchantId=" + merchantId +
                 ", userId=" + userId +
                 ", totalRegularPrice=" + totalRegularPrice +
                 ", totalPointPrice=" + totalPointPrice +
@@ -50,14 +50,14 @@ public class Order {
     }
 
 
-    @JsonProperty("barId")
-    public int getBarId() {
-        return barId;
+    @JsonProperty("merchantId")
+    public int getMerchantId() {
+        return merchantId;
     }
 
-    @JsonProperty("barId")
-    public void setBarId(int barId) {
-        this.barId = barId;
+    @JsonProperty("merchantId")
+    public void setMerchantId(int merchantId) {
+        this.merchantId = merchantId;
     }
 
     @JsonProperty("userId")

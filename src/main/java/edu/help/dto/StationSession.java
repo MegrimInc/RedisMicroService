@@ -2,39 +2,39 @@ package edu.help.dto;
 
 import java.io.Serializable;
 
-public class BartenderSession implements Serializable {
-    private int barId;
-    private String bartenderId;
+public class StationSession implements Serializable {
+    private int merchantId;
+    private String stationId;
     private String sessionId;
     private boolean active;
 
     // Default constructor
-    public BartenderSession() {
+    public StationSession() {
     }
 
     // Constructor with parameters
-    public BartenderSession(int barId, String bartenderId, String sessionId, boolean active) {
-        this.barId = barId;
-        this.bartenderId = bartenderId;
+    public StationSession(int merchantId, String stationId, String sessionId, boolean active) {
+        this.merchantId = merchantId;
+        this.stationId = stationId;
         this.sessionId = sessionId;
         this.active = active;
     }
 
     // Getters and Setters
-    public int getBarId() {
-        return barId;
+    public int getMerchantId() {
+        return merchantId;
     }
 
-    public void setBarId(int barId) {
-        this.barId = barId;
+    public void setMerchantId(int merchantId) {
+        this.merchantId = merchantId;
     }
 
-    public String getBartenderId() {
-        return bartenderId;
+    public String getStationId() {
+        return stationId;
     }
 
-    public void setBartenderId(String bartenderId) {
-        this.bartenderId = bartenderId;
+    public void setStationId(String stationId) {
+        this.stationId = stationId;
     }
 
     public String getSessionId() {
@@ -55,9 +55,9 @@ public class BartenderSession implements Serializable {
 
     @Override
     public String toString() {
-        return "BartenderSession{" +
-                "barId=" + barId +
-                ", bartenderId='" + bartenderId + '\'' +
+        return "StationSession{" +
+                "merchantId=" + merchantId +
+                ", stationId='" + stationId + '\'' +
                 ", sessionId='" + sessionId + '\'' +
                 ", active=" + active +
                 '}';

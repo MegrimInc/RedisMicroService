@@ -23,12 +23,10 @@ import edu.help.dto.Order;
 import edu.help.dto.OrderRequest;
 import edu.help.dto.OrderResponse;
 import edu.help.dto.ResponseWrapper;
-import edu.help.websocket.BartenderWebSocketHandler;
+import edu.help.websocket.StationWebSocketHandler;
 import edu.help.websocket.OrderWebSocketHandler;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
-import redis.clients.jedis.Transaction;
 
 
 import redis.clients.jedis.params.ScanParams;
@@ -50,7 +48,7 @@ public class OrderService {
     }
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
-        System.out.println("Processing order for barId: " + orderRequest.getBarId());
+        System.out.println("Processing order for merchantId: " + orderRequest.getMerchantId());
 
         // Fetch the total quantity of items ordered
         int totalQuantity = orderRequest.getDrinks().stream()
@@ -72,15 +70,15 @@ public class OrderService {
         }
 
         // Fetch open and happyHour status from Redis
-        String barKey = String.valueOf(orderRequest.getBarId());
-        Boolean isOpen = Boolean.valueOf(jedisPooled.hget(barKey, "open"));
+        String merchantKey = String.valueOf(orderRequest.getMerchantId());
+        Boolean isOpen = Boolean.valueOf(jedisPooled.hget(merchantKey, "open"));
 
-        // Check if the bar is open
+        // Check if the merchant is open
         if (isOpen == null || !isOpen) {
             sendOrderResponse(session, new ResponseWrapper(
                     "error",
-                    null, // No data, as the bar is closed
-                    "Failed to process order: The bar is currently closed."));
+                    null, // No data, as the merchant is closed
+                    "Failed to process order: The merchant is currently closed."));
             return;
         }
 
@@ -144,7 +142,7 @@ public class OrderService {
         try {
             // Send order request to PostgreSQL
             OrderResponse orderResponse = restTemplate.postForObject(
-                    "http://34.230.32.169:8080/" + orderRequest.getBarId() + "/processOrder",
+                    "http://34.230.32.169:8080/" + orderRequest.getMerchantId() + "/processOrder",
                     orderRequest,
                     OrderResponse.class);
 
@@ -160,7 +158,7 @@ public class OrderService {
 
                 Order order = new Order(
                     orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER ID WITH SOMETHING GENERATED
-                    orderRequest.getBarId(),
+                    orderRequest.getMerchantId(),
                     orderRequest.getUserId(),
                     orderResponse.getTotalPrice(), // Using the total price from the response
                     orderResponse.getTotalPointPrice(),
@@ -186,12 +184,12 @@ public class OrderService {
                             
                     //OrderWebSocketHandler.getInstance().sendCreateNotification(orderRequest);
 
-                    // Broadcast the order to bartenders
+                    // Broadcast the order to stations
                     Map<String, Object> data = new HashMap<>();
                     data.put("orders", Collections.singletonList(order));
                     try {
-                        BartenderWebSocketHandler.getInstance().broadcastToBar(orderRequest.getBarId(), data);
-                        System.out.println("Sent order to bartender");
+                        StationWebSocketHandler.getInstance().broadcastToMerchant(orderRequest.getMerchantId(), data);
+                        System.out.println("Sent order to station");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -226,7 +224,7 @@ public class OrderService {
     }
 
     private String generateOrderKey(OrderRequest orderRequest) {
-        return String.format("%d.%d", orderRequest.getBarId(), orderRequest.getUserId());
+        return String.format("%d.%d", orderRequest.getMerchantId(), orderRequest.getUserId());
     }
 
     private void sendOrderResponse(WebSocketSession session, ResponseWrapper responseWrapper) {
@@ -324,12 +322,12 @@ public class OrderService {
         }
     }
 
-    public void arriveOrder(WebSocketSession session, int barID, int userID) {
+    public void arriveOrder(WebSocketSession session, int merchantID, int userID) {
 
-        System.out.println("ArrivingOrder order for barId: " + barID);
+        System.out.println("ArrivingOrder order for merchantId: " + merchantID);
 
         // Fetch open and happyHour status from Redis
-        String orderKey = barID + "." + userID;
+        String orderKey = merchantID + "." + userID;
         Order existingOrder = null;
 
 
@@ -405,12 +403,12 @@ public class OrderService {
                     OrderWebSocketHandler.getInstance().sendArrivedNotification(userID, existingOrder.getClaimer() );
 
 
-                    // Broadcast the order to bartenders
+                    // Broadcast the order to stations
                     Map<String, Object> data = new HashMap<>();
                     data.put("orders", Collections.singletonList(existingOrder));
                     try {
-                        BartenderWebSocketHandler.getInstance().broadcastToBar(existingOrder.getBarId(), data);
-                        System.out.println("Notified Bartenders that person is arrived");
+                        StationWebSocketHandler.getInstance().broadcastToMerchant(existingOrder.getMerchantId(), data);
+                        System.out.println("Notified Stations that person is arrived");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }

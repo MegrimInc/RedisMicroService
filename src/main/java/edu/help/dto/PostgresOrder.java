@@ -13,7 +13,7 @@ import java.util.List;
 public class PostgresOrder {
 
     private int orderId; // Unique identifier for each order
-    private int barId; // ID of the bar where the order was placed
+    private int merchantId; // ID of the merchant where the order was placed
     private int userId; // ID of the user who placed the order
     private Instant timestamp; // Timestamp when the order was completed
     private List<DrinkOrderDTO> drinks; // List of drink orders
@@ -22,8 +22,8 @@ public class PostgresOrder {
     private double tip; // Tip amount given by the user for the order
     private boolean inAppPayments; // Indicates if the payment was made in-app
     private String status; // Final status of the order ('claimed', 'delivered', 'canceled')
-    private String station; // Bartender station identifier (A-Z)
-    private String tipsClaimed; // "NULL" (as a string) if not claimed, or the bartender's name
+    private String station; // Station station identifier (A-Z)
+    private String tipsClaimed; // "NULL" (as a string) if not claimed, or the station's name
 
     @Data
     @NoArgsConstructor

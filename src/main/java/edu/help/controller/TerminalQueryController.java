@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import edu.help.dto.BartenderSession;
+import edu.help.dto.StationSession;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
@@ -37,15 +37,15 @@ public class TerminalQueryController {
     }
 
     /**
-     * Example GET endpoint:  https://www.barzzy.site/ws/http/checkTerminals?barID=123
+     * Example GET endpoint:  https://www.megrim.site/ws/http/checkTerminals?merchantID=123
      *
      * Returns a string containing the list of active terminals, e.g. "AB", or "" if none.
      */
     @GetMapping("/checkTerminals")
-    public ResponseEntity<String> checkTerminalsGET(@RequestParam("barID") int barId) {
+    public ResponseEntity<String> checkTerminalsGET(@RequestParam("merchantID") int merchantId) {
         try {
             // We'll reuse a method below that does the actual check
-            String activeTerminals = getActiveTerminals(barId);
+            String activeTerminals = getActiveTerminals(merchantId);
             return ResponseEntity.ok(activeTerminals);
         } catch (Exception e) {
             e.printStackTrace();
@@ -56,14 +56,14 @@ public class TerminalQueryController {
 
 
     /**
-     * The main logic that scans Redis for <barId>.<bartenderID> keys,
-     * deserializes them into BartenderSession objects, and
+     * The main logic that scans Redis for <merchantId>.<stationID> keys,
+     * deserializes them into StationSession objects, and
      * collects the ones that are 'active'.
      */
-    private String getActiveTerminals(int barId) throws Exception {
-        // Example pattern: "123.[a-zA-Z]*" for barId=123
-        String pattern = barId + ".[a-zA-Z]*";
-        List<String> activeBartenders = new ArrayList<>();
+    private String getActiveTerminals(int merchantId) throws Exception {
+        // Example pattern: "123.[a-zA-Z]*" for merchantId=123
+        String pattern = merchantId + ".[a-zA-Z]*";
+        List<String> activeStations = new ArrayList<>();
 
         try (Jedis jedis = jedisPool.getResource()) {
             // We'll scan Redis for keys matching the pattern
@@ -76,29 +76,29 @@ public class TerminalQueryController {
                 List<String> matchedKeys = scanResult.getResult();
 
                 for (String key : matchedKeys) {
-                    // Attempt to retrieve the BartenderSession from Redis
-                    BartenderSession bartenderSession = null;
+                    // Attempt to retrieve the StationSession from Redis
+                    StationSession stationSession = null;
                     try {
-                        bartenderSession = jedisPooled.jsonGet(key, BartenderSession.class);
+                        stationSession = jedisPooled.jsonGet(key, StationSession.class);
                     } catch (Exception e) {
                         // if deserialization fails, skip
                         continue;
                     }
                     // If we got a session and it's active, add it to our list
-                    if (bartenderSession != null && bartenderSession.getActive()) {
-                        // The bartenderID portion is whatever comes after the dot
-                        // but we can also read from bartenderSession.getBartenderId()
-                        activeBartenders.add(bartenderSession.getBartenderId());
+                    if (stationSession != null && stationSession.getActive()) {
+                        // The stationID portion is whatever comes after the dot
+                        // but we can also read from stationSession.getStationId()
+                        activeStations.add(stationSession.getStationId());
                     }
                 }
             } while (!"0".equals(cursor));
         }
 
-        // If we have multiple bartenders, say [A, B], we want "AB"
+        // If we have multiple stations, say [A, B], we want "AB"
         // Sorting them alphabetically can be helpful to keep it deterministic:
-        Collections.sort(activeBartenders);
+        Collections.sort(activeStations);
 
         // Join them with no delimiter to produce a string "AB"
-        return String.join("", activeBartenders);
+        return String.join("", activeStations);
     }
 }

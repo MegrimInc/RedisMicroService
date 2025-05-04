@@ -8,12 +8,11 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 public class TipClaimResponse {
-    private String barEmail;
+    private String merchantEmail;
     private List<PostgresOrder> orders;
 
-    public TipClaimResponse(String barEmail)
+    public TipClaimResponse(String merchantEmail)
     {
-        this.barEmail = barEmail;
+        this.merchantEmail = merchantEmail;
     }
 }
-
