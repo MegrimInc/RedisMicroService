@@ -23,14 +23,14 @@ import redis.clients.jedis.resps.ScanResult;
 // Could also be @RestController, which automatically adds @ResponseBody
 @RestController
 @RequestMapping("/ws/http")
-public class TerminalQueryController {
+public class TerminalController {
 
     private final JedisPooled jedisPooled;
     private final JedisPool jedisPool;
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public TerminalQueryController(JedisPooled jedisPooled, JedisPool jedisPool, ObjectMapper objectMapper) {
+    public TerminalController(JedisPooled jedisPooled, JedisPool jedisPool, ObjectMapper objectMapper) {
         this.jedisPooled = jedisPooled;
         this.jedisPool = jedisPool;
         this.objectMapper = objectMapper;
