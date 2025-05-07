@@ -22,7 +22,7 @@ import redis.clients.jedis.resps.ScanResult;
 
 // Could also be @RestController, which automatically adds @ResponseBody
 @RestController
-@RequestMapping("/ws/http")
+@RequestMapping("redis-test-api")
 public class TerminalController {
 
     private final JedisPooled jedisPooled;
@@ -37,7 +37,7 @@ public class TerminalController {
     }
 
     /**
-     * Example GET endpoint:  https://www.megrim.site/ws/http/checkTerminals?merchantID=123
+     * Example GET endpoint:  https://www.megrim.com/ws/http/checkTerminals?merchantID=123
      *
      * Returns a string containing the list of active terminals, e.g. "AB", or "" if none.
      */

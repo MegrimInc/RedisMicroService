@@ -22,9 +22,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(orderWebSocketHandler, "/ws/orders")
+        registry.addHandler(orderWebSocketHandler, "/redis-test-ws/orders")
                 .setAllowedOrigins("*");
-        registry.addHandler(terminalWebSocketHandler, "/ws/terminals")
+        registry.addHandler(terminalWebSocketHandler, "/redis-test-ws/terminals")
                 .setAllowedOrigins("*");
     }
 }
