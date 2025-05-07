@@ -42,7 +42,7 @@ public class TerminalController {
      * Returns a string containing the list of active terminals, e.g. "AB", or "" if none.
      */
     @GetMapping("/checkTerminals")
-    public ResponseEntity<String> checkTerminalsGET(@RequestParam("merchantID") int merchantId) {
+    public ResponseEntity<String> checkTerminalsGET(@RequestParam("merchantId") int merchantId) {
         try {
             // We'll reuse a method below that does the actual check
             String activeTerminals = getActiveTerminals(merchantId);
