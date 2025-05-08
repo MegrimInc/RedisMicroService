@@ -925,6 +925,7 @@
                 } while (!"0".equals(cursor));
             }
 
+            
             // Debug: Print the matching session Ids
             System.out.println("Matching session Ids for merchant " + merchantId + ": " + matchingSessionIds);
 
