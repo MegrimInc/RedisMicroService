@@ -108,8 +108,8 @@
                         break;
 
                     case "open":
-                        int merchantID = (int) payloadMap.get("merchantID");
-                        String merchantKey = String.valueOf(merchantID); // Adjust this to match your specific key format
+                        int merchantId = (int) payloadMap.get("merchantId");
+                        String merchantKey = String.valueOf(merchantId); // Adjust this to match your specific key format
 
                         try (Jedis jedis = jedisPool.getResource()) {
                             jedis.watch(merchantKey);
@@ -135,7 +135,7 @@
                                 // Convert the map to a JSON string (if needed)
 
                                 // Use the existing broadcastToMerchant method to notify all terminals
-                                broadcastToMerchant(merchantID, openPayload);
+                                broadcastToMerchant(merchantId, openPayload);
                             } else {
                                 sendErrorMessage(session, "Failed to open the merchant due to a race condition.");
                             }
@@ -146,8 +146,8 @@
                         break;
 
                     case "close":
-                        int merchantID2 = (int) payloadMap.get("merchantID");
-                        String merchantKey2 = String.valueOf(merchantID2); // Adjust this to match your specific key format
+                        int merchantId2 = (int) payloadMap.get("merchantId");
+                        String merchantKey2 = String.valueOf(merchantId2); // Adjust this to match your specific key format
 
                         try (Jedis jedis = jedisPool.getResource()) {
                             jedis.watch(merchantKey2);
@@ -171,7 +171,7 @@
                                 closePayload.put("merchantStatus", false);
 
                                 // Use the existing broadcastToMerchant method to notify all terminals
-                                broadcastToMerchant(merchantID2, closePayload);
+                                broadcastToMerchant(merchantId2, closePayload);
                             } else {
                                 sendErrorMessage(session, "Failed to close the merchant due to a race condition.");
                             }
@@ -197,18 +197,18 @@
             session.sendMessage(new TextMessage(response.toString()));
         }
 
-        private void notifyTerminalsOfActiveConnections(int merchantID) {
-            System.out.println("notifyTerminalsOfActiveConnections triggered with merchantID: " + merchantID);
+        private void notifyTerminalsOfActiveConnections(int merchantId) {
+            System.out.println("notifyTerminalsOfActiveConnections triggered with merchantId: " + merchantId);
 
-            String pattern = merchantID + ".[a-zA-Z]*";
-            System.out.println("Searching for keys with pattern ID: " + pattern);
+            String pattern = merchantId + ".[a-zA-Z]*";
+            System.out.println("Searching for keys with pattern Id: " + pattern);
 
             try (Jedis jedis = jedisPool.getResource()) {
-                // Find all terminal keys for the given merchantID
+                // Find all terminal keys for the given merchantId
                 Set<String> terminalKeys = jedis.keys(pattern);
                 System.out.println("Found terminal keys: " + terminalKeys);
 
-                // Filter terminals with getActive() == true and where terminalID is alphabetic
+                // Filter terminals with getActive() == true and where terminalId is alphabetic
                 List<TerminalSession> acceptingTerminals = new ArrayList<>();
                 for (String key : terminalKeys) {
                     System.out.println("Processing key: " + key);
@@ -218,9 +218,9 @@
                         continue;
                     }
 
-                    String terminalID = parts[1];
-                    System.out.println("Found terminalID: " + terminalID);
-                    if (terminalID.matches("[a-zA-Z]+")) { // Ensure terminalID is alphabetic
+                    String terminalId = parts[1];
+                    System.out.println("Found terminalId: " + terminalId);
+                    if (terminalId.matches("[a-zA-Z]+")) { // Ensure terminalId is alphabetic
                         TerminalSession terminalSession = null;
                         try {
                             // Deserialize the stored JSON into a TerminalSession object
@@ -233,7 +233,7 @@
                         }
 
                         if (terminalSession != null && terminalSession.getActive()) { // Changed from isActive() to getActive()
-                            System.out.println("Terminal is active: " + terminalID);
+                            System.out.println("Terminal is active: " + terminalId);
                             acceptingTerminals.add(terminalSession);
                         }
                     }
@@ -277,21 +277,21 @@
         @Transactional
         public void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
 
-            int merchantID = (int) payload.get("merchantID");
-            String terminalID = (String) payload.get("terminalID");
+            int merchantId = (int) payload.get("merchantId");
+            String terminalId = (String) payload.get("terminalId");
 
-            System.out.println("Received terminalID: " + terminalID);
-            System.out.println("Received merchantID: " + merchantID);
+            System.out.println("Received terminalId: " + terminalId);
+            System.out.println("Received merchantId: " + merchantId);
 
-            if (terminalID == null || terminalID.isEmpty() || !terminalID.matches("[a-zA-Z]+")) {
+            if (terminalId == null || terminalId.isEmpty() || !terminalId.matches("[a-zA-Z]+")) {
                 // Send an error response
                 sendErrorMessage(session,
-                        "Initialization Failed: Invalid terminalID. It must be non-empty and contain only alphabetic characters.");
+                        "Initialization Failed: Invalid terminalId. It must be non-empty and contain only alphabetic characters.");
                 return;
             }
 
             // Create the Redis key
-            String redisKey = merchantID + "." + terminalID;
+            String redisKey = merchantId + "." + terminalId;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(redisKey); // Watch the key for changes
@@ -315,12 +315,12 @@
                         terminateMessage.put("terminate", true);
                         existingWsSession.sendMessage(new TextMessage(terminateMessage.toString()));
                         existingWsSession.close();
-                        System.out.println("Closing the connection for..." + terminalID);
+                        System.out.println("Closing the connection for..." + terminalId);
                     }
                 }
 
                 // Store the new session in Redis and in the session map
-                TerminalSession newSession = new TerminalSession(merchantID, terminalID, session.getId(), true);
+                TerminalSession newSession = new TerminalSession(merchantId, terminalId, session.getId(), true);
 
                 Transaction transaction = jedis.multi(); // Start the transaction
                 System.out.println("Attempting to execute Redis transaction...");
@@ -339,10 +339,10 @@
 
                 sessionMap.put(session.getId(), session); // Store the session in the session map
                 System.out.println("TerminalSession stored in Redis: " + session);
-                session.sendMessage(new TextMessage("Initialization successful for terminal " + terminalID));
+                session.sendMessage(new TextMessage("Initialization successful for terminal " + terminalId));
 
                 // Notify each terminal of active WebSocket connections
-                notifyTerminalsOfActiveConnections(merchantID);
+                notifyTerminalsOfActiveConnections(merchantId);
                 handleRefreshAction(session, payload);
 
             }
@@ -350,11 +350,11 @@
 
         @Transactional
         public void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-            int merchantID = (int) payload.get("merchantID");
-            int userID = (int) payload.get("userID");
-            String terminalID = (String) payload.get("terminalID");
+            int merchantId = (int) payload.get("merchantId");
+            int customerId = (int) payload.get("customerId");
+            String terminalId = (String) payload.get("terminalId");
 
-            String orderRedisKey = merchantID + "." + userID;
+            String orderRedisKey = merchantId + "." + customerId;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(orderRedisKey); // Watch the key for changes
@@ -376,7 +376,7 @@
 
                 String currentClaimer = order.getClaimer();
 
-                if (!terminalID.equals(currentClaimer)) {
+                if (!terminalId.equals(currentClaimer)) {
                     sendErrorMessage(session,
                             "You cannot deliver this order because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
@@ -412,19 +412,19 @@
                 Map<String, Object> data = new HashMap<>();
                 data.put("update", Collections.singletonList(order));
 
-                broadcastToMerchant(merchantID, data);
+                broadcastToMerchant(merchantId, data);
 
-                orderWebSocketHandler.updateUser(order);
+                orderWebSocketHandler.updateCustomer(order);
             }
         }
 
         @Transactional
         public void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-            int merchantID = (int) payload.get("merchantID");
-            int userID = (int) payload.get("userID");
-            String cancelingTerminalID = (String) payload.get("terminalID");
+            int merchantId = (int) payload.get("merchantId");
+            int customerId = (int) payload.get("customerId");
+            String cancelingTerminalId = (String) payload.get("terminalId");
 
-            String orderRedisKey = merchantID + "." + userID;
+            String orderRedisKey = merchantId + "." + customerId;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(orderRedisKey); // Watch the key for changes
@@ -446,7 +446,7 @@
 
                 // Check if the canceling terminal is the one who claimed the order
                 String currentClaimer = order.getClaimer();
-                if (!cancelingTerminalID.equals(currentClaimer)) {
+                if (!cancelingTerminalId.equals(currentClaimer)) {
                     sendErrorMessage(session, "You cannot cancel this order as it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
                     return;
@@ -475,19 +475,19 @@
                 Map<String, Object> data = new HashMap<>();
                 data.put("update", Collections.singletonList(order));
 
-                broadcastToMerchant(merchantID, data);
+                broadcastToMerchant(merchantId, data);
 
-                orderWebSocketHandler.updateUser(order);
+                orderWebSocketHandler.updateCustomer(order);
             }
         }
 
         @Transactional
         public void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-            int merchantID = (int) payload.get("merchantID");
-            int userID = (int) payload.get("userID");
-            String claimingTerminalID = (String) payload.get("terminalID");
+            int merchantId = (int) payload.get("merchantId");
+            int customerId = (int) payload.get("customerId");
+            String claimingTerminalId = (String) payload.get("terminalId");
 
-            String orderRedisKey = merchantID + "." + userID;
+            String orderRedisKey = merchantId + "." + customerId;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(orderRedisKey); // Watch the key for changes
@@ -538,7 +538,7 @@
                 }
 
                 // Update the order with the new claimer
-                order.setClaimer(claimingTerminalID);
+                order.setClaimer(claimingTerminalId);
 
                 // Start the transaction
                 Transaction transaction = jedis.multi();
@@ -555,20 +555,20 @@
                 Map<String, Object> data = new HashMap<>();
                 data.put("update", Collections.singletonList(order));
 
-                broadcastToMerchant(merchantID, data);
+                broadcastToMerchant(merchantId, data);
 
-                orderWebSocketHandler.updateUser(order);
+                orderWebSocketHandler.updateCustomer(order);
 
             }
         }
 
         @Transactional
         public void handleReadyAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-            int merchantID = (int) payload.get("merchantID");
-            int userID = (int) payload.get("userID");
-            String readyTerminalID = (String) payload.get("terminalID");
+            int merchantId = (int) payload.get("merchantId");
+            int customerId = (int) payload.get("customerId");
+            String readyTerminalId = (String) payload.get("terminalId");
 
-            String orderRedisKey = merchantID + "." + userID;
+            String orderRedisKey = merchantId + "." + customerId;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(orderRedisKey); // Watch the key for changes
@@ -604,7 +604,7 @@
 
                 String currentClaimer = order.getClaimer();
 
-                if (!readyTerminalID.equals(currentClaimer)) {
+                if (!readyTerminalId.equals(currentClaimer)) {
                     sendErrorMessage(session,
                             "You cannot mark this order as ready because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
@@ -635,19 +635,19 @@
                 Map<String, Object> data = new HashMap<>();
                 data.put("update", Collections.singletonList(order));
 
-                broadcastToMerchant(merchantID, data);
+                broadcastToMerchant(merchantId, data);
 
-                orderWebSocketHandler.updateUser(order);
+                orderWebSocketHandler.updateCustomer(order);
             }
         }
 
         @Transactional
         public void handleUnclaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-            int merchantID = (int) payload.get("merchantID");
-            int userID = (int) payload.get("userID");
-            String unclaimingTerminalID = (String) payload.get("terminalID");
+            int merchantId = (int) payload.get("merchantId");
+            int customerId = (int) payload.get("customerId");
+            String unclaimingTerminalId = (String) payload.get("terminalId");
 
-            String orderRedisKey = merchantID + "." + userID;
+            String orderRedisKey = merchantId + "." + customerId;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(orderRedisKey); // Watch the key for changes
@@ -683,7 +683,7 @@
 
                 String currentClaimer = order.getClaimer();
 
-                if (!unclaimingTerminalID.equals(currentClaimer)) {
+                if (!unclaimingTerminalId.equals(currentClaimer)) {
                     sendErrorMessage(session,
                             "You cannot unclaim this order because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
@@ -706,26 +706,26 @@
                 Map<String, Object> data = new HashMap<>();
                 data.put("update", Collections.singletonList(order));
 
-                broadcastToMerchant(merchantID, data);
+                broadcastToMerchant(merchantId, data);
 
-                orderWebSocketHandler.updateUser(order);
+                orderWebSocketHandler.updateCustomer(order);
             }
         }
 
         @Transactional
         public void handleDisableAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-            int merchantID = (int) payload.get("merchantID");
-            String terminalID = (String) payload.get("terminalID");
+            int merchantId = (int) payload.get("merchantId");
+            String terminalId = (String) payload.get("terminalId");
 
-            if (terminalID == null || terminalID.isEmpty() || !terminalID.matches("[a-zA-Z]+")) {
+            if (terminalId == null || terminalId.isEmpty() || !terminalId.matches("[a-zA-Z]+")) {
                 // Send an error response
                 sendErrorMessage(session,
-                        "Invalid terminalID. It must be non-empty and contain only alphabetic characters.");
+                        "Invalid terminalId. It must be non-empty and contain only alphabetic characters.");
                 return;
             }
 
             // Create the Redis key
-            String redisKey = merchantID + "." + terminalID;
+            String redisKey = merchantId + "." + terminalId;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(redisKey); // Watch the key for changes
@@ -734,7 +734,7 @@
                 Object terminalJsonObj = jedisPooled.jsonGet(redisKey);
 
                 if (terminalJsonObj == null) {
-                    sendErrorMessage(session, "No active session found for terminal " + terminalID + ".");
+                    sendErrorMessage(session, "No active session found for terminal " + terminalId + ".");
                     jedis.unwatch(); // Unwatch if the data doesn't exist
                     return;
                 }
@@ -776,7 +776,7 @@
                 session.sendMessage(new TextMessage("{\"disable\":\"true\"}"));
 
                 // Notify all terminals of active WebSocket connections
-                notifyTerminalsOfActiveConnections(merchantID);
+                notifyTerminalsOfActiveConnections(merchantId);
             } catch (Exception e) {
                 // Handle any exceptions that occur during the process
                 e.printStackTrace();
@@ -792,16 +792,16 @@
 
         @Transactional
         public void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-            int merchantID = (int) payload.get("merchantID");
+            int merchantId = (int) payload.get("merchantId");
 
             try (Jedis jedis = jedisPool.getResource()) {
                 // Prepare to scan Redis for keys matching the pattern
-                ScanParams scanParams = new ScanParams().match(merchantID + ".*");
+                ScanParams scanParams = new ScanParams().match(merchantId + ".*");
                 String cursor = "0";
 
                 List<Order> orders = new ArrayList<>();
 
-                System.out.println("Scanning Redis with pattern: " + merchantID + ".*");
+                System.out.println("Scanning Redis with pattern: " + merchantId + ".*");
                 System.out.println("Initial cursor value: " + cursor);
 
                 do {
@@ -819,7 +819,7 @@
                     // Process each key, but only if it matches the format merchantId.# (where # is a number)
                     for (String key : keys) {
                         // Match the format merchantId.# and ensure the part after the dot is entirely numeric
-                        if (key.matches(merchantID + "\\.\\d+")) { // This regex matches merchantID.# where # is one or more digits
+                        if (key.matches(merchantId + "\\.\\d+")) { // This regex matches merchantId.# where # is one or more digits
                             try {
                                 // Retrieve the JSON object from Redis
                                 Object orderJsonObj = jedisPooled.jsonGet(key);
@@ -836,7 +836,7 @@
                                 if (!orderJsonObj.toString().contains("active")) {
                                     orders.add(order);
                                 } else {
-                                    System.out.println("Skipping session-related data for key ID: " + key);
+                                    System.out.println("Skipping session-related data for key Id: " + key);
                                 }
                             } catch (JedisDataException e) {
                                 System.err.println(
@@ -872,7 +872,7 @@
                     session.sendMessage(new TextMessage("{\"orders\":[]}"));
                 }
 
-                String merchantStatus = jedis.hget(String.valueOf(merchantID), "open");
+                String merchantStatus = jedis.hget(String.valueOf(merchantId), "open");
 
                 if (merchantStatus != null) {
                     boolean status = merchantStatus.equals("true");
@@ -894,15 +894,15 @@
 
         }
 
-        public void broadcastToMerchant(int merchantID, Map<String, Object> data) throws IOException {
+        public void broadcastToMerchant(int merchantId, Map<String, Object> data) throws IOException {
             // Prepare the data to be broadcasted
             String message = objectMapper.writeValueAsString(data);
 
             // Debug: Print the message that is being broadcasted
-            System.out.println("Broadcasting message to merchant " + merchantID + ": " + message);
+            System.out.println("Broadcasting message to merchant " + merchantId + ": " + message);
 
             // Step 1: Scan Redis for keys matching the format merchantId.AlphabeticLetter
-            String pattern = merchantID + ".[a-zA-Z]*";
+            String pattern = merchantId + ".[a-zA-Z]*";
             List<String> matchingSessionIds = new ArrayList<>();
 
             try (Jedis jedis = jedisPool.getResource()) {
@@ -925,21 +925,21 @@
                 } while (!"0".equals(cursor));
             }
 
-            // Debug: Print the matching session IDs
-            System.out.println("Matching session IDs for merchant " + merchantID + ": " + matchingSessionIds);
+            // Debug: Print the matching session Ids
+            System.out.println("Matching session Ids for merchant " + merchantId + ": " + matchingSessionIds);
 
             // Step 3: Filter the sessionMap to find open sessions that match the retrieved sessionIds
             for (Map.Entry<String, WebSocketSession> entry : sessionMap.entrySet()) {
-                String sessionID = entry.getKey();
+                String sessionId = entry.getKey();
                 WebSocketSession wsSession = entry.getValue();
 
-                if (matchingSessionIds.contains(sessionID) && wsSession.isOpen()) {
-                    // Debug: Print the session ID before sending the message
-                    System.out.println("Sending message to session ID: " + sessionID);
+                if (matchingSessionIds.contains(sessionId) && wsSession.isOpen()) {
+                    // Debug: Print the session Id before sending the message
+                    System.out.println("Sending message to session Id: " + sessionId);
                     wsSession.sendMessage(new TextMessage(message));
                 } else {
                     // Debug: If session is not open or does not match, log it
-                    System.out.println("Session ID: " + sessionID + " is not open or does not match. Skipping.");
+                    System.out.println("Session Id: " + sessionId + " is not open or does not match. Skipping.");
                 }
             }
         }

@@ -37,7 +37,7 @@ public class TerminalController {
     }
 
     /**
-     * Example GET endpoint:  https://www.megrim.com/ws/http/checkTerminals?merchantID=123
+     * Example GET endpoint:  https://www.megrim.com/ws/http/checkTerminals?merchantId=123
      *
      * Returns a string containing the list of active terminals, e.g. "AB", or "" if none.
      */
@@ -56,7 +56,7 @@ public class TerminalController {
 
 
     /**
-     * The main logic that scans Redis for <merchantId>.<terminalID> keys,
+     * The main logic that scans Redis for <merchantId>.<terminalId> keys,
      * deserializes them into TerminalSession objects, and
      * collects the ones that are 'active'.
      */
@@ -86,7 +86,7 @@ public class TerminalController {
                     }
                     // If we got a session and it's active, add it to our list
                     if (terminalSession != null && terminalSession.getActive()) {
-                        // The terminalID portion is whatever comes after the dot
+                        // The terminalId portion is whatever comes after the dot
                         // but we can also read from terminalSession.getTerminalId()
                         activeTerminals.add(terminalSession.getTerminalId());
                     }

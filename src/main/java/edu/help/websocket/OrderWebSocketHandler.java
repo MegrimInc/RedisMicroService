@@ -80,7 +80,7 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         // Log the connection establishment
-        System.out.println("WebSocket connection established with session ID: " + session.getId());
+        System.out.println("WebSocket connection established with session Id: " + session.getId());
 
         sessionMap.put(session.getId(), session);
 
@@ -116,11 +116,11 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                 orderRequest = objectMapper.convertValue(payloadMap, OrderRequest.class);
                 System.out.println("Parsed OrderRequest: " + orderRequest);
             } catch (IllegalArgumentException e) {
-                // Send a response if deserialization fails, indicating the user needs to update their app
+                // Send a response if deserialization fails, indicating the customer needs to update their app
                 String updateMessage = "We’ve recently updated our app to improve your experience. "
                     + "Please update to the latest version to continue using our service seamlessly.";
                 sendErrorResponse(session, updateMessage);
-                System.err.println("OrderRequest deserialization failed. Prompting user to update their app.");
+                System.err.println("OrderRequest deserialization failed. Prompting customer to update their app.");
                 return;
             }
     
@@ -137,16 +137,16 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                     }
                     break;
                 case "arrive":
-                    int userId = (int) payloadMap.get("userId");
+                    int customerId = (int) payloadMap.get("customerId");
                     int merchantId = (int) payloadMap.get("merchantId");
-                    orderService.arriveOrder( session, merchantId, userId);
+                    orderService.arriveOrder( session, merchantId, customerId);
                    
                     break;
                 case "refresh":
-                    int userIdToRefresh = (int) payloadMap.get("userId");
+                    int customerIdToRefresh = (int) payloadMap.get("customerId");
                     String deviceToken = (String) payloadMap.get("deviceToken");
-                    updateDeviceToken(userIdToRefresh, deviceToken);
-                    orderService.refreshOrdersForUser(userIdToRefresh, session);
+                    updateDeviceToken(customerIdToRefresh, deviceToken);
+                    orderService.refreshOrdersForCustomer(customerIdToRefresh, session);
 
                     break;
                 default:
@@ -193,22 +193,22 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    public void updateUser(Order order) throws IOException {
+    public void updateCustomer(Order order) throws IOException {
         // Extract required fields from the Order object
         String status = order.getStatus(); // Get the order status
         String claimer = order.getClaimer() != null ? order.getClaimer() : ""; // Default to empty if null
-        String sessionId = order.getSessionId(); // Retrieve session ID from the order
-        int userId = order.getUserId(); // Retrieve user ID
-        String deviceToken = deviceTokenMap.get(String.valueOf(userId)); // Lookup device token using userId
+        String sessionId = order.getSessionId(); // Retrieve session Id from the order
+        int customerId = order.getCustomerId(); // Retrieve customer Id
+        String deviceToken = deviceTokenMap.get(String.valueOf(customerId)); // Lookup device token using customerId
         double totalPrice = order.getTotalRegularPrice();
         int pointsAwarded = (int) Math.round(totalPrice * 10 * 1.20);
        
     
         // Retrieve the WebSocket session from the sessionMap using the sessionId
-        WebSocketSession userSession = sessionMap.get(sessionId);
+        WebSocketSession customerSession = sessionMap.get(sessionId);
     
         // Send WebSocket message if the session is found and open
-        if (userSession != null && userSession.isOpen()) {
+        if (customerSession != null && customerSession.isOpen()) {
             // Wrap the order into a ResponseWrapper for the update
             ResponseWrapper response = new ResponseWrapper(
                     "update", // Message type
@@ -219,10 +219,10 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             // Convert the ResponseWrapper to a JSON string
             String jsonResponse = objectMapper.writeValueAsString(response);
     
-            // Send the JSON response to the user via WebSocket
-            userSession.sendMessage(new TextMessage(jsonResponse));
+            // Send the JSON response to the customer via WebSocket
+            customerSession.sendMessage(new TextMessage(jsonResponse));
         } else {
-            System.err.println("User session not found or closed: " + sessionId);
+            System.err.println("Customer session not found or closed: " + sessionId);
         }
     
         // Send push notification if the deviceToken exists
@@ -261,15 +261,15 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             System.out.println("Sending push notification: " + notificationMessage);
             sendPushNotification(deviceToken, notificationMessage);
         } else {
-            System.err.println("No device token found for userId: " + userId + ", unable to send push notification.");
+            System.err.println("No device token found for customerId: " + customerId + ", unable to send push notification.");
         }
     }
 
     // Method to update the deviceTokenMap from OrderService
-    public void updateDeviceToken(int userId, String deviceToken) {
-        String userIdStr = String.valueOf(userId);
-        deviceTokenMap.put(userIdStr, deviceToken);
-        System.out.println("Device token for userId " + userId + " has been stored/updated.");
+    public void updateDeviceToken(int customerId, String deviceToken) {
+        String customerIdStr = String.valueOf(customerId);
+        deviceTokenMap.put(customerIdStr, deviceToken);
+        System.out.println("Device token for customerId " + customerId + " has been stored/updated.");
     }
 
     // Corrected sendPushNotification method
@@ -286,7 +286,7 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             // Create the push notification
             SimpleApnsPushNotification pushNotification = new SimpleApnsPushNotification(
                     sanitizedToken,
-                    "com.example.megrimApp9", // Replace with your app's bundle ID
+                    "com.example.megrimApp9", // Replace with your app's bundle Id
                     payload);
 
             // Use PushNotificationFuture for handling notification responses
@@ -318,22 +318,22 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     //     String message = "Your order has been placed!";
 
     //     // Retrieve device token
-    //     String deviceToken = deviceTokenMap.get(String.valueOf(orderRequest.getUserId()));
+    //     String deviceToken = deviceTokenMap.get(String.valueOf(orderRequest.getCustomerId()));
     //     if (deviceToken != null && !deviceToken.isEmpty()) {
     //         sendPushNotification(deviceToken, message);
     //     } else {
-    //         System.err.println("No device token found for userId: " + orderRequest.getUserId());
+    //         System.err.println("No device token found for customerId: " + orderRequest.getCustomerId());
     //     }
     // }
 
-    public void sendArrivedNotification(int userID, String claimer) {
-        String deviceToken = deviceTokenMap.get(String.valueOf(userID));
+    public void sendArrivedNotification(int customerId, String claimer) {
+        String deviceToken = deviceTokenMap.get(String.valueOf(customerId));
         if (deviceToken != null && !deviceToken.isEmpty()) {
             
             String message = "Worker \"" + claimer + "\" will call your name shortly.";
             sendPushNotification(deviceToken, message);
         } else {
-            System.err.println("No device token found for userId: " + userID);
+            System.err.println("No device token found for customerId: " + customerId);
         }
     }
 }

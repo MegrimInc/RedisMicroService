@@ -157,9 +157,9 @@ public class OrderService {
                 }
 
                 Order order = new Order(
-                    orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER ID WITH SOMETHING GENERATED
+                    orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER Id WITH SOMETHING GENERATED
                     orderRequest.getMerchantId(),
-                    orderRequest.getUserId(),
+                    orderRequest.getCustomerId(),
                     orderResponse.getTotalPrice(), // Using the total price from the response
                     orderResponse.getTotalPointPrice(),
                     orderResponse.getTip(),
@@ -224,7 +224,7 @@ public class OrderService {
     }
 
     private String generateOrderKey(OrderRequest orderRequest) {
-        return String.format("%d.%d", orderRequest.getMerchantId(), orderRequest.getUserId());
+        return String.format("%d.%d", orderRequest.getMerchantId(), orderRequest.getCustomerId());
     }
 
     private void sendOrderResponse(WebSocketSession session, ResponseWrapper responseWrapper) {
@@ -257,8 +257,8 @@ public class OrderService {
     }
 
 
-    public void refreshOrdersForUser(int userId, WebSocketSession session) {
-        ScanParams scanParams = new ScanParams().match("*." + userId);
+    public void refreshOrdersForCustomer(int customerId, WebSocketSession session) {
+        ScanParams scanParams = new ScanParams().match("*." + customerId);
         String cursor = "0";
         List<Order> orders = new ArrayList<>();
 
@@ -306,7 +306,7 @@ public class OrderService {
                 sendOrderResponse(session, new ResponseWrapper(
                         "info",
                         null,
-                        "No orders found for the user."));
+                        "No orders found for the customer."));
             } else {
                 for (Order order : orders) {
                     sendOrderResponse(session, new ResponseWrapper(
@@ -322,12 +322,12 @@ public class OrderService {
         }
     }
 
-    public void arriveOrder(WebSocketSession session, int merchantID, int userID) {
+    public void arriveOrder(WebSocketSession session, int merchantId, int customerId) {
 
-        System.out.println("ArrivingOrder order for merchantId: " + merchantID);
+        System.out.println("ArrivingOrder order for merchantId: " + merchantId);
 
         // Fetch open and happyHour status from Redis
-        String orderKey = merchantID + "." + userID;
+        String orderKey = merchantId + "." + customerId;
         Order existingOrder = null;
 
 
@@ -400,7 +400,7 @@ public class OrderService {
                             existingOrder,
                             "Marked as arrived."));
 
-                    OrderWebSocketHandler.getInstance().sendArrivedNotification(userID, existingOrder.getClaimer() );
+                    OrderWebSocketHandler.getInstance().sendArrivedNotification(customerId, existingOrder.getClaimer() );
 
 
                     // Broadcast the order to terminals

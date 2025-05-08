@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 public class OrderRequest {
     private int merchantId;
-    private int userId;
+    private int customerId;
     private double tip; // Renamed field
     private List<DrinkOrder> drinks;
     private boolean inAppPayments;
@@ -20,7 +20,7 @@ public class OrderRequest {
     public String toString() {
         return "OrderRequest{" +
                 "merchantId=" + merchantId +
-                ", userId=" + userId +
+                ", customerId=" + customerId +
                 ", tip=" + tip + // Updated toString
                 ", drinks=" + drinks +
                 ", inAppPayments=" + inAppPayments +
