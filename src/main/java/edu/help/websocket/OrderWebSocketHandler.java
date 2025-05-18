@@ -196,7 +196,7 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     public void updateCustomer(Order order) throws IOException {
         // Extract required fields from the Order object
         String status = order.getStatus(); // Get the order status
-        String claimer = order.getClaimer() != null ? order.getClaimer() : ""; // Default to empty if null
+        String claimer = order.getTerminal() != null ? order.getTerminal() : ""; // Default to empty if null
         String sessionId = order.getSessionId(); // Retrieve session Id from the order
         int customerId = order.getCustomerId(); // Retrieve customer Id
         String deviceToken = deviceTokenMap.get(String.valueOf(customerId)); // Lookup device token using customerId

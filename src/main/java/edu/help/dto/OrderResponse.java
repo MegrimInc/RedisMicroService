@@ -5,28 +5,28 @@ import java.util.List;
 public class OrderResponse {
     private String message, name, messageType;
     private double totalPrice, tip;
-    private List<DrinkOrder> drinks;
+    private List<ItemOrder> items;
     private int totalPointPrice;
     // And also we will need to check on the frontend how it works.
     public OrderResponse() {
         // Default constructor
     }
 
-    public OrderResponse(String name, String message, double totalPrice, double tip, List<DrinkOrder> drinks, String messageType, int totalPointPrice) {
+    public OrderResponse(String name, String message, double totalPrice, double tip, List<ItemOrder> items, String messageType, int totalPointPrice) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.tip = tip; // Updated initialization
-        this.drinks = drinks;
+        this.items = items;
         this.messageType = messageType;
         this.totalPointPrice = totalPointPrice;
         this.name = name;
     }
 
-    public OrderResponse(String name, String message, double totalPrice, double tip, List<DrinkOrder> drinks, int totalPointPrice) {
+    public OrderResponse(String name, String message, double totalPrice, double tip, List<ItemOrder> items, int totalPointPrice) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.tip = tip; // Updated initialization
-        this.drinks = drinks;
+        this.items = items;
         this.messageType = "";
         this.totalPointPrice = totalPointPrice;
         this.name = name;
@@ -63,12 +63,12 @@ public class OrderResponse {
         this.tip = tip;
     }
 
-    public List<DrinkOrder> getDrinks() {
-        return drinks;
+    public List<ItemOrder> getItems() {
+        return items;
     }
 
-    public void setDrinks(List<DrinkOrder> drinks) {
-        this.drinks = drinks;
+    public void setItems(List<ItemOrder> items) {
+        this.items = items;
     }
 
     public String getMessageType() {
@@ -87,38 +87,36 @@ public class OrderResponse {
         this.totalPointPrice = totalPointPrice;
     }
 
-    // Inner class representing a drink order
-    // Updated DrinkOrder inner class with all required fields
-    public static class DrinkOrder {
-        private int drinkId;
-        private String drinkName;
+    // Inner class representing a item order
+    // Updated ItemOrder inner class with all required fields
+    public static class ItemOrder {
+        private int itemId;
+        private String itemName;
         private int quantity;
         private String paymentType; // "points" or "regular"
-        private String sizeType; // "single", "double", or empty for drinks without size variations
 
-        public DrinkOrder(int drinkId, String drinkName, int quantity, String paymentType, String sizeType) {
-            this.drinkId = drinkId;
-            this.drinkName = drinkName;
+        public ItemOrder(int itemId, String itemName, int quantity, String paymentType) {
+            this.itemId = itemId;
+            this.itemName = itemName;
             this.quantity = quantity;
             this.paymentType = paymentType;
-            this.sizeType = sizeType;
         }
 
         // Getters and Setters
-        public int getDrinkId() {
-            return drinkId;
+        public int getItemId() {
+            return itemId;
         }
 
-        public void setDrinkId(int drinkId) {
-            this.drinkId = drinkId;
+        public void setItemId(int itemId) {
+            this.itemId = itemId;
         }
 
-        public String getDrinkName() {
-            return drinkName;
+        public String getItemName() {
+            return itemName;
         }
 
-        public void setDrinkName(String drinkName) {
-            this.drinkName = drinkName;
+        public void setItemName(String itemName) {
+            this.itemName = itemName;
         }
 
         public int getQuantity() {
@@ -137,22 +135,14 @@ public class OrderResponse {
             this.paymentType = paymentType;
         }
 
-        public String getSizeType() {
-            return sizeType;
-        }
-
-        public void setSizeType(String sizeType) {
-            this.sizeType = sizeType;
-        }
 
         @Override
         public String toString() {
-            return "DrinkOrder{" +
-                    "drinkId=" + drinkId +
-                    ", drinkName='" + drinkName + '\'' +
+            return "ItemOrder{" +
+                    "itemId=" + itemId +
+                    ", itemName='" + itemName + '\'' +
                     ", quantity=" + quantity +
                     ", paymentType='" + paymentType + '\'' +
-                    ", sizeType='" + sizeType + '\'' +
                     '}';
         }
     }

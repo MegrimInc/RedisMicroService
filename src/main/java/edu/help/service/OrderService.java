@@ -51,8 +51,8 @@ public class OrderService {
         System.out.println("Processing order for merchantId: " + orderRequest.getMerchantId());
 
         // Fetch the total quantity of items ordered
-        int totalQuantity = orderRequest.getDrinks().stream()
-                .mapToInt(OrderRequest.DrinkOrder::getQuantity)
+        int totalQuantity = orderRequest.getItems().stream()
+                .mapToInt(OrderRequest.ItemOrder::getQuantity)
                 .sum();
 
         // Determine quantity limit based on payment type
@@ -60,7 +60,7 @@ public class OrderService {
 
         // Check if total quantity exceeds the limit
         if (totalQuantity > quantityLimit) {
-            String message = "You can only add up to 10 drinks per order";
+            String message = "You can only add up to 10 items per order";
      
             System.out.println("Order quantity limit exceeded: " + message);
 
@@ -150,9 +150,9 @@ public class OrderService {
                 String status = "unready";
                 String claimer = "";
                 boolean pointOfSale = false;
-                if (orderRequest.getClaimer() != null && !orderRequest.getClaimer().isEmpty()) {
+                if (orderRequest.getTerminal() != null && !orderRequest.getTerminal().isEmpty()) {
                     status = "arrived";
-                    claimer = orderRequest.getClaimer();
+                    claimer = orderRequest.getTerminal();
                     pointOfSale = true;
                 }
 
@@ -164,7 +164,7 @@ public class OrderService {
                     orderResponse.getTotalPointPrice(),
                     orderResponse.getTip(),
                     orderRequest.isInAppPayments(), // Assuming this is from the request
-                    convertDrinksToOrders(orderResponse.getDrinks()),
+                    convertItemsToOrders(orderResponse.getItems()),
                     pointOfSale,
                     status,
                     claimer,
@@ -211,14 +211,14 @@ public class OrderService {
         }
     }
 
-    private List<Order.DrinkOrder> convertDrinksToOrders(List<OrderResponse.DrinkOrder> drinkResponses) {
-        return drinkResponses.stream()
-                .map(drink -> new Order.DrinkOrder(
-                        drink.getDrinkId(),
-                        drink.getDrinkName(),
-                        drink.getPaymentType(),  // Now using the provided paymentType
-                        drink.getSizeType(),     // Now using the provided sizeType
-                        drink.getQuantity()
+    private List<Order.ItemOrder> convertItemsToOrders(List<OrderResponse.ItemOrder> itemResponses) {
+        return itemResponses.stream()
+                .map(item -> new Order.ItemOrder(
+                        item.getItemId(),
+                        item.getItemName(),
+                        item.getPaymentType(),  // Now using the provided paymentType
+                           
+                        item.getQuantity()
                 ))
                 .toList();
     }
@@ -400,7 +400,7 @@ public class OrderService {
                             existingOrder,
                             "Marked as arrived."));
 
-                    OrderWebSocketHandler.getInstance().sendArrivedNotification(customerId, existingOrder.getClaimer() );
+                    OrderWebSocketHandler.getInstance().sendArrivedNotification(customerId, existingOrder.getTerminal() );
 
 
                     // Broadcast the order to terminals

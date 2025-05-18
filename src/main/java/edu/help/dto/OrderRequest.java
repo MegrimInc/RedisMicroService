@@ -9,49 +9,46 @@ import java.util.List;
 public class OrderRequest {
     private int merchantId;
     private int customerId;
-    private double tip; // Renamed field
-    private List<DrinkOrder> drinks;
+    private List<ItemOrder> items;
     private boolean inAppPayments;
-    private boolean happyHour;
+    private boolean isDiscount;
     @Nullable
-    private String claimer;
+    private String terminal;
 
     @Override
     public String toString() {
         return "OrderRequest{" +
                 "merchantId=" + merchantId +
                 ", customerId=" + customerId +
-                ", tip=" + tip + // Updated toString
-                ", drinks=" + drinks +
+                ", items=" + items +
                 ", inAppPayments=" + inAppPayments +
-                ", happyHour=" + happyHour +
-                ", claimer=" + claimer +
+                ", isDiscount=" + isDiscount +
+                ", terminal=" + terminal +
                 '}';
     }
 
-    public static class DrinkOrder {
-        private int drinkId;
+    public static class ItemOrder {
+        private int itemId;
         private int quantity;
         private String paymentType; // "points" or "regular"
-        private String sizeType; // "single" or "double" or empty for drinks without size variations
+       
 
         @Override
         public String toString() {
-            return "DrinkOrder{" +
-                    "drinkId=" + drinkId +
+            return "ItemOrder{" +
+                    "itemId=" + itemId +
                     ", quantity=" + quantity +
                     ", paymentType='" + paymentType + '\'' +
-                    ", sizeType='" + sizeType + '\'' +
                     '}';
         }
 
         // Getters and Setters
-        public int getDrinkId() {
-            return drinkId;
+        public int getItemId() {
+            return itemId;
         }
 
-        public void setDrinkId(int drinkId) {
-            this.drinkId = drinkId;
+        public void setItemId(int itemId) {
+            this.itemId = itemId;
         }
 
         public int getQuantity() {
@@ -68,14 +65,6 @@ public class OrderRequest {
 
         public void setPaymentType(String paymentType) {
             this.paymentType = paymentType;
-        }
-
-        public String getSizeType() {
-            return sizeType;
-        }
-
-        public void setSizeType(String sizeType) {
-            this.sizeType = sizeType;
         }
     }
 }

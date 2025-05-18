@@ -5,14 +5,14 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 //This is the same as https://github.com/MegrimLLC/frontend/blob/0.0.0/lib/backend/customerorder2.dart
 public class Order {
-    private String sessionId, name, status, claimer, timestamp ; //TODO WESLEY change to string and refactor
+    private String sessionId, name, status, terminal, timestamp ; //TODO WESLEY change to string and refactor
     private int merchantId, customerId, totalPointPrice;
     private double totalRegularPrice, tip;
     private boolean inAppPayments, pointOfSale;
-    private List<DrinkOrder> drinks;
+    private List<ItemOrder> items;
 
     public Order(String name, int merchantId, int customerId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
-            List<DrinkOrder> drinks, boolean pointOfSale, String status, String claimer, String timestamp, String sessionId) {
+            List<ItemOrder> items, boolean pointOfSale, String status, String terminal, String timestamp, String sessionId) {
         this.name = name;
         this.merchantId = merchantId;
         this.customerId = customerId;
@@ -20,10 +20,10 @@ public class Order {
         this.totalPointPrice = totalPointPrice; 
         this.tip = tip; 
         this.inAppPayments = inAppPayments;
-        this.drinks = drinks;
+        this.items = items;
         this.pointOfSale = pointOfSale;
         this.status = status;
-        this.claimer = claimer;
+        this.terminal = terminal;
         this.timestamp = timestamp;
         this.sessionId = sessionId;
     }
@@ -41,9 +41,9 @@ public class Order {
                 ", totalPointPrice=" + totalPointPrice +
                 ", tip=" + tip + // Updated toString
                 ", inAppPayments=" + inAppPayments +
-                ", drinks=" + drinks +
+                ", items=" + items +
                 ", status='" + status + '\'' +
-                ", claimer='" + claimer + '\'' +
+                ", terminal='" + terminal + '\'' +
                 ", timestamp='" + timestamp + '\'' +
                 ", sessionId='" + sessionId + '\'' +
                 '}';
@@ -101,14 +101,14 @@ public class Order {
         this.inAppPayments = inAppPayments;
     }
 
-    @JsonProperty("drinks")
-    public List<DrinkOrder> getDrinks() {
-        return drinks;
+    @JsonProperty("items")
+    public List<ItemOrder> getItems() {
+        return items;
     }
 
-    @JsonProperty("drinks")
-    public void setDrinks(List<DrinkOrder> drinks) {
-        this.drinks = drinks;
+    @JsonProperty("items")
+    public void setItems(List<ItemOrder> items) {
+        this.items = items;
     }
 
     @JsonProperty("pointOfSale")
@@ -131,14 +131,14 @@ public class Order {
         this.status = status;
     }
 
-    @JsonProperty("claimer")
-    public String getClaimer() {
-        return claimer;
+    @JsonProperty("terminal")
+    public String getTerminal() {
+        return terminal;
     }
 
-    @JsonProperty("claimer")
-    public void setClaimer(String claimer) {
-        this.claimer = claimer;
+    @JsonProperty("terminal")
+    public void setTerminal(String terminal) {
+        this.terminal = terminal;
     }
 
     @JsonProperty("timestamp")
@@ -181,54 +181,51 @@ public class Order {
         return name;
     }
 
-    // Updated DrinkOrder class with drinkName
-    public static class DrinkOrder {
-        private int drinkId;
-        private String drinkName;  // Added back drinkName
-        private String paymentType;  // "points" or "regular"
-        private String sizeType;     // "single" or "double"
+    // Updated DrinkOrder class with itemName
+    public static class ItemOrder {
+        private int itemId;
+        private String itemName;  // Added back itemName
+        private String paymentType;  // "points" or "regular"    
         private int quantity;
 
-        public DrinkOrder(int drinkId, String drinkName, String paymentType, String sizeType, int quantity) {
-            this.drinkId = drinkId;
-            this.drinkName = drinkName;
+        public ItemOrder(int itemId, String itemName, String paymentType, int quantity) {
+            this.itemId = itemId;
+            this.itemName = itemName;
             this.paymentType = paymentType;
-            this.sizeType = sizeType;
             this.quantity = quantity;
         }
 
-        public DrinkOrder() {
+        public ItemOrder() {
         }
 
         @Override
         public String toString() {
             return "DrinkOrder{" +
-                    "drinkId=" + drinkId +
-                    ", drinkName='" + drinkName + '\'' +
+                    "itemId=" + itemId +
+                    ", itemName='" + itemName + '\'' +
                     ", paymentType='" + paymentType + '\'' +
-                    ", sizeType='" + sizeType + '\'' +
                     ", quantity=" + quantity +
                     '}';
         }
 
-        @JsonProperty("drinkId")
+        @JsonProperty("itemId")
         public int getDrinkId() {
-            return drinkId;
+            return itemId;
         }
 
-        @JsonProperty("drinkId")
-        public void setDrinkId(int drinkId) {
-            this.drinkId = drinkId;
+        @JsonProperty("itemId")
+        public void setDrinkId(int itemId) {
+            this.itemId = itemId;
         }
 
-        @JsonProperty("drinkName")
+        @JsonProperty("itemName")
         public String getDrinkName() {
-            return drinkName;
+            return itemName;
         }
 
-        @JsonProperty("drinkName")
-        public void setDrinkName(String drinkName) {
-            this.drinkName = drinkName;
+        @JsonProperty("itemName")
+        public void setDrinkName(String itemName) {
+            this.itemName = itemName;
         }
 
         @JsonProperty("paymentType")
@@ -241,15 +238,6 @@ public class Order {
             this.paymentType = paymentType;
         }
 
-        @JsonProperty("sizeType")
-        public String getSizeType() {
-            return sizeType;
-        }
-
-        @JsonProperty("sizeType")
-        public void setSizeType(String sizeType) {
-            this.sizeType = sizeType;
-        }
 
         @JsonProperty("quantity")
         public int getQuantity() {

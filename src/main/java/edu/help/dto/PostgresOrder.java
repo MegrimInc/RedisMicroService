@@ -16,7 +16,7 @@ public class PostgresOrder {
     private int merchantId; // Id of the merchant where the order was placed
     private int customerId; // Id of the customer who placed the order
     private Instant timestamp; // Timestamp when the order was completed
-    private List<DrinkOrderDTO> drinks; // List of drink orders
+    private List<ItemOrderDTO> items; // List of item orders
     private int totalPointPrice; // Total price in points if used for payment
     private double totalRegularPrice; // Total price in dollars
     private double tip; // Tip amount given by the customer for the order
@@ -28,11 +28,10 @@ public class PostgresOrder {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class DrinkOrderDTO {
-        private int drinkId;
-        private String drinkName;
+    public static class ItemOrderDTO {
+        private int itemId;
+        private String itemName;
         private String paymentType;
-        private String sizeType;
         private int quantity;
     }
 }

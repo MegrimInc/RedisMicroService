@@ -374,9 +374,9 @@
                 // Deserialize the JSON string into an Order object
                 Order order = objectMapper.readValue(orderJson, Order.class);
 
-                String currentClaimer = order.getClaimer();
+                String currentTerminal = order.getTerminal();
 
-                if (!terminalId.equals(currentClaimer)) {
+                if (!terminalId.equals(currentTerminal)) {
                     sendErrorMessage(session,
                             "You cannot deliver this order because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
@@ -445,8 +445,8 @@
                 Order order = objectMapper.readValue(orderJson, Order.class);
 
                 // Check if the canceling terminal is the one who claimed the order
-                String currentClaimer = order.getClaimer();
-                if (!cancelingTerminalId.equals(currentClaimer)) {
+                String currentTerminal = order.getTerminal();
+                if (!cancelingTerminalId.equals(currentTerminal)) {
                     sendErrorMessage(session, "You cannot cancel this order as it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
                     return;
@@ -522,8 +522,8 @@
                 }
 
                 // Check if the order is already claimed
-                String currentClaimer = order.getClaimer();
-                if (currentClaimer != null && !currentClaimer.isEmpty()) {
+                String currentTerminal = order.getTerminal();
+                if (currentTerminal != null && !currentTerminal.isEmpty()) {
                     sendErrorMessage(session, "Order is already claimed.");
                     jedis.unwatch(); // Unwatch if the order is already claimed
                     return;
@@ -538,7 +538,7 @@
                 }
 
                 // Update the order with the new claimer
-                order.setClaimer(claimingTerminalId);
+                order.setTerminal(claimingTerminalId);
 
                 // Start the transaction
                 Transaction transaction = jedis.multi();
@@ -602,9 +602,9 @@
                     return;
                 }
 
-                String currentClaimer = order.getClaimer();
+                String currentTerminal = order.getTerminal();
 
-                if (!readyTerminalId.equals(currentClaimer)) {
+                if (!readyTerminalId.equals(currentTerminal)) {
                     sendErrorMessage(session,
                             "You cannot mark this order as ready because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
@@ -681,9 +681,9 @@
                     return;
                 }
 
-                String currentClaimer = order.getClaimer();
+                String currentTerminal = order.getTerminal();
 
-                if (!unclaimingTerminalId.equals(currentClaimer)) {
+                if (!unclaimingTerminalId.equals(currentTerminal)) {
                     sendErrorMessage(session,
                             "You cannot unclaim this order because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
@@ -691,7 +691,7 @@
                 }
 
                 // Update the order to remove the claimer
-                order.setClaimer("");
+                order.setTerminal("");
 
                 Transaction transaction = jedis.multi(); // Start the transaction
                 String updatedOrderJson = objectMapper.writeValueAsString(order);
@@ -925,7 +925,7 @@
                 } while (!"0".equals(cursor));
             }
 
-            
+
             // Debug: Print the matching session Ids
             System.out.println("Matching session Ids for merchant " + merchantId + ": " + matchingSessionIds);
 
