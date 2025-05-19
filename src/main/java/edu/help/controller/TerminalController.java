@@ -19,10 +19,11 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
+import static edu.help.config.ApiConfig.BASE_HTTP_PATH;
 
 // Could also be @RestController, which automatically adds @ResponseBody
 @RestController
-@RequestMapping("redis-test-http")
+@RequestMapping(BASE_HTTP_PATH)
 public class TerminalController {
 
     private final JedisPooled jedisPooled;
