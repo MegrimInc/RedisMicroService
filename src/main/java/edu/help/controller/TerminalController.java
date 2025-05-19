@@ -22,7 +22,7 @@ import redis.clients.jedis.resps.ScanResult;
 
 // Could also be @RestController, which automatically adds @ResponseBody
 @RestController
-@RequestMapping("redis-test-api")
+@RequestMapping("redis-test-http")
 public class TerminalController {
 
     private final JedisPooled jedisPooled;
