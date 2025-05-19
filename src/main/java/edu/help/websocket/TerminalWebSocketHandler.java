@@ -209,7 +209,7 @@
                 Set<String> terminalKeys = jedis.keys(pattern);
                 System.out.println("Found terminal keys: " + terminalKeys);
 
-                // Filter terminals with getActive() == true and where terminalId is alphabetic
+                // Filter terminals with getActive() == true and where terminal is alphabetic
                 List<TerminalSession> acceptingTerminals = new ArrayList<>();
                 for (String key : terminalKeys) {
                     System.out.println("Processing key: " + key);
@@ -219,9 +219,9 @@
                         continue;
                     }
 
-                    String terminalId = parts[1];
-                    System.out.println("Found terminalId: " + terminalId);
-                    if (terminalId.matches("[a-zA-Z]+")) { // Ensure terminalId is alphabetic
+                    String terminal = parts[1];
+                    System.out.println("Found terminal: " + terminal);
+                    if (terminal.matches("[a-zA-Z]+")) { // Ensure terminal is alphabetic
                         TerminalSession terminalSession = null;
                         try {
                             // Deserialize the stored JSON into a TerminalSession object
@@ -234,7 +234,7 @@
                         }
 
                         if (terminalSession != null && terminalSession.getActive()) { // Changed from isActive() to getActive()
-                            System.out.println("Terminal is active: " + terminalId);
+                            System.out.println("Terminal is active: " + terminal);
                             acceptingTerminals.add(terminalSession);
                         }
                     }
@@ -279,20 +279,20 @@
         public void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
 
             int merchantId = (int) payload.get("merchantId");
-            String terminalId = (String) payload.get("terminalId");
+            String terminal = (String) payload.get("terminal");
 
-            System.out.println("Received terminalId: " + terminalId);
+            System.out.println("Received terminal: " + terminal);
             System.out.println("Received merchantId: " + merchantId);
 
-            if (terminalId == null || terminalId.isEmpty() || !terminalId.matches("[a-zA-Z]+")) {
+            if (terminal == null || terminal.isEmpty() || !terminal.matches("[a-zA-Z]+")) {
                 // Send an error response
                 sendErrorMessage(session,
-                        "Initialization Failed: Invalid terminalId. It must be non-empty and contain only alphabetic characters.");
+                        "Initialization Failed: Invalid terminal. It must be non-empty and contain only alphabetic characters.");
                 return;
             }
 
             // Create the Redis key
-            String redisKey = merchantId + "." + terminalId;
+            String redisKey = merchantId + "." + terminal;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(redisKey); // Watch the key for changes
@@ -316,12 +316,12 @@
                         terminateMessage.put("terminate", true);
                         existingWsSession.sendMessage(new TextMessage(terminateMessage.toString()));
                         existingWsSession.close();
-                        System.out.println("Closing the connection for..." + terminalId);
+                        System.out.println("Closing the connection for..." + terminal);
                     }
                 }
 
                 // Store the new session in Redis and in the session map
-                TerminalSession newSession = new TerminalSession(merchantId, terminalId, session.getId(), true);
+                TerminalSession newSession = new TerminalSession(merchantId, terminal, session.getId(), true);
 
                 Transaction transaction = jedis.multi(); // Start the transaction
                 System.out.println("Attempting to execute Redis transaction...");
@@ -340,7 +340,7 @@
 
                 sessionMap.put(session.getId(), session); // Store the session in the session map
                 System.out.println("TerminalSession stored in Redis: " + session);
-                session.sendMessage(new TextMessage("Initialization successful for terminal " + terminalId));
+                session.sendMessage(new TextMessage("Initialization successful for terminal " + terminal));
 
                 // Notify each terminal of active WebSocket connections
                 notifyTerminalsOfActiveConnections(merchantId);
@@ -353,7 +353,7 @@
         public void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String terminalId = (String) payload.get("terminalId");
+            String terminal = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -377,7 +377,7 @@
 
                 String currentTerminal = order.getTerminal();
 
-                if (!terminalId.equals(currentTerminal)) {
+                if (!terminal.equals(currentTerminal)) {
                     sendErrorMessage(session,
                             "You cannot deliver this order because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
@@ -423,7 +423,7 @@
         public void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String cancelingTerminalId = (String) payload.get("terminalId");
+            String cancelingTerminalId = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -486,7 +486,7 @@
         public void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String claimingTerminalId = (String) payload.get("terminalId");
+            String claimingTerminalId = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -567,7 +567,7 @@
         public void handleReadyAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String readyTerminalId = (String) payload.get("terminalId");
+            String readyTerminalId = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -646,7 +646,7 @@
         public void handleUnclaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String unclaimingTerminalId = (String) payload.get("terminalId");
+            String unclaimingTerminalId = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -716,17 +716,17 @@
         @Transactional
         public void handleDisableAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
-            String terminalId = (String) payload.get("terminalId");
+            String terminal = (String) payload.get("terminal");
 
-            if (terminalId == null || terminalId.isEmpty() || !terminalId.matches("[a-zA-Z]+")) {
+            if (terminal == null || terminal.isEmpty() || !terminal.matches("[a-zA-Z]+")) {
                 // Send an error response
                 sendErrorMessage(session,
-                        "Invalid terminalId. It must be non-empty and contain only alphabetic characters.");
+                        "Invalid terminal. It must be non-empty and contain only alphabetic characters.");
                 return;
             }
 
             // Create the Redis key
-            String redisKey = merchantId + "." + terminalId;
+            String redisKey = merchantId + "." + terminal;
 
             try (Jedis jedis = jedisPool.getResource()) {
                 jedis.watch(redisKey); // Watch the key for changes
@@ -735,7 +735,7 @@
                 Object terminalJsonObj = jedisPooled.jsonGet(redisKey);
 
                 if (terminalJsonObj == null) {
-                    sendErrorMessage(session, "No active session found for terminal " + terminalId + ".");
+                    sendErrorMessage(session, "No active session found for terminal " + terminal + ".");
                     jedis.unwatch(); // Unwatch if the data doesn't exist
                     return;
                 }
