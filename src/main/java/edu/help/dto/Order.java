@@ -90,7 +90,7 @@ public class Order {
         return totalGratuity;
     }
 
-    @JsonProperty("totalGrauity")
+    @JsonProperty("totalGratuity")
     public void setTotalGratuity(double totalGratuity) {
         this.totalGratuity = totalGratuity;
     }

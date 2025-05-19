@@ -31,7 +31,7 @@ import redis.clients.jedis.JedisPooled;
 
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
-import static edu.help.config.ApiConfig.BASE_HTTP_PATH;
+import static edu.help.config.ApiConfig.FULL_HTTP_PATH;
 
 @Service
 public class OrderService {
@@ -143,7 +143,7 @@ public class OrderService {
         try {
             // Send order request to PostgreSQL
             OrderResponse orderResponse = restTemplate.postForObject(
-                    BASE_HTTP_PATH + orderRequest.getMerchantId() + "/processOrder",
+                    FULL_HTTP_PATH + "/order/" + orderRequest.getMerchantId() + "/processOrder",
                     orderRequest,
                     OrderResponse.class);
 
