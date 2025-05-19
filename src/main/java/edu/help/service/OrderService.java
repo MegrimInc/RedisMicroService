@@ -45,7 +45,7 @@ public class OrderService {
         this.restTemplate = restTemplate;
         this.jedisPooled = jedisPooled;
         this.jedisPool = jedisPool;
-        
+
     }
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
@@ -62,7 +62,7 @@ public class OrderService {
         // Check if total quantity exceeds the limit
         if (totalQuantity > quantityLimit) {
             String message = "You can only add up to 10 items per order";
-     
+
             System.out.println("Order quantity limit exceeded: " + message);
 
             // Send error response and exit
@@ -147,6 +147,13 @@ public class OrderService {
                     orderRequest,
                     OrderResponse.class);
 
+            try {
+                System.out.println("[DEBUG] OrderResponse received from backend: "
+                        + objectMapper.writeValueAsString(orderResponse));
+            } catch (JsonProcessingException e) {
+                System.err.println("[ERROR] Failed to serialize OrderResponse: " + e.getMessage());
+            }
+
             if (orderResponse != null) {
                 String status = "unready";
                 String claimer = "";
@@ -158,22 +165,21 @@ public class OrderService {
                 }
 
                 Order order = new Order(
-                    orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER Id WITH SOMETHING GENERATED
-                    orderRequest.getMerchantId(),
-                    orderRequest.getCustomerId(),
-                    orderResponse.getTotalPrice(), // Using the total price from the response
-                    orderResponse.getTotalPointPrice(),
-                    orderResponse.getTotalGratuity(),
-                    orderResponse.getTotalServiceFee(),
-                    orderResponse.getTotalTax(),
-                    orderRequest.isInAppPayments(), // Assuming this is from the request
-                    convertItemsToOrders(orderResponse.getItems()),
-                    pointOfSale,
-                    status,
-                    claimer,
-                    getCurrentTimestamp(),
-                    session.getId()
-                );
+                        orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER Id WITH SOMETHING GENERATED
+                        orderRequest.getMerchantId(),
+                        orderRequest.getCustomerId(),
+                        orderResponse.getTotalPrice(), // Using the total price from the response
+                        orderResponse.getTotalPointPrice(),
+                        orderResponse.getTotalGratuity(),
+                        orderResponse.getTotalServiceFee(),
+                        orderResponse.getTotalTax(),
+                        orderResponse.isInAppPayments(), // Assuming this is from the request
+                        convertItemsToOrders(orderResponse.getItems()),
+                        pointOfSale,
+                        status,
+                        claimer,
+                        getCurrentTimestamp(),
+                        session.getId());
 
                 if (!"error".equals(orderResponse.getMessageType())) {
 
@@ -184,7 +190,7 @@ public class OrderService {
                             "create",
                             order,
                             "Order successfully processed."));
-                            
+
                     //OrderWebSocketHandler.getInstance().sendCreateNotification(orderRequest);
 
                     // Broadcast the order to terminals
@@ -219,10 +225,8 @@ public class OrderService {
                 .map(item -> new Order.ItemOrder(
                         item.getItemId(),
                         item.getItemName(),
-                        item.getPaymentType(),  // Now using the provided paymentType
-                           
-                        item.getQuantity()
-                ))
+                        item.getPaymentType(), // Now using the provided paymentType
+                        item.getQuantity()))
                 .toList();
     }
 
@@ -258,7 +262,6 @@ public class OrderService {
     private String getCurrentTimestamp() {
         return String.valueOf(System.currentTimeMillis());
     }
-
 
     public void refreshOrdersForCustomer(int customerId, WebSocketSession session) {
         ScanParams scanParams = new ScanParams().match("*." + customerId);
@@ -333,10 +336,7 @@ public class OrderService {
         String orderKey = merchantId + "." + customerId;
         Order existingOrder = null;
 
-
-
         System.out.println("Parsed order key: " + orderKey);
-
 
         if (jedisPooled.exists(orderKey)) {
             System.out.println("Order key exists in Redis: " + orderKey);
@@ -377,7 +377,7 @@ public class OrderService {
                 String existingStatus = existingOrder.getStatus();
                 System.out.println("Existing order status: " + existingStatus);
 
-                if ( !"ready".equals(existingStatus) ) {
+                if (!"ready".equals(existingStatus)) {
                     System.out.println("Order not ready : status=" + existingStatus);
                     sendOrderResponse(session, new ResponseWrapper(
                             "error",
@@ -394,29 +394,25 @@ public class OrderService {
             assert existingOrder != null;
             existingOrder.setStatus("arrived");
 
+            jedisPooled.jsonSetWithEscape(orderKey, existingOrder);
+            System.out.println("Re-Stored order in Redis with key: " + orderKey);
 
-                    jedisPooled.jsonSetWithEscape(orderKey, existingOrder);
-                    System.out.println("Re-Stored order in Redis with key: " + orderKey);
+            sendOrderResponse(session, new ResponseWrapper(
+                    "update",
+                    existingOrder,
+                    "Marked as arrived."));
 
-                    sendOrderResponse(session, new ResponseWrapper(
-                            "update",
-                            existingOrder,
-                            "Marked as arrived."));
+            OrderWebSocketHandler.getInstance().sendArrivedNotification(customerId, existingOrder.getTerminal());
 
-                    OrderWebSocketHandler.getInstance().sendArrivedNotification(customerId, existingOrder.getTerminal() );
-
-
-                    // Broadcast the order to terminals
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("orders", Collections.singletonList(existingOrder));
-                    try {
-                        TerminalWebSocketHandler.getInstance().broadcastToMerchant(existingOrder.getMerchantId(), data);
-                        System.out.println("Notified Terminals that person is arrived");
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-
+            // Broadcast the order to terminals
+            Map<String, Object> data = new HashMap<>();
+            data.put("orders", Collections.singletonList(existingOrder));
+            try {
+                TerminalWebSocketHandler.getInstance().broadcastToMerchant(existingOrder.getMerchantId(), data);
+                System.out.println("Notified Terminals that person is arrived");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
         } catch (RestClientException e) {
             e.printStackTrace();

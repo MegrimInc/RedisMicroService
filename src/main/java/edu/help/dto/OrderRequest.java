@@ -10,7 +10,6 @@ public class OrderRequest {
     private int merchantId;
     private int customerId;
     private List<ItemOrder> items;
-    private boolean inAppPayments;
     private boolean isDiscount;
     @Nullable
     private String terminal;
@@ -21,7 +20,6 @@ public class OrderRequest {
                 "merchantId=" + merchantId +
                 ", customerId=" + customerId +
                 ", items=" + items +
-                ", inAppPayments=" + inAppPayments +
                 ", isDiscount=" + isDiscount +
                 ", terminal=" + terminal +
                 '}';

@@ -19,11 +19,13 @@ public class PostgresOrder {
     private List<ItemOrderDTO> items; // List of item orders
     private int totalPointPrice; // Total price in points if used for payment
     private double totalRegularPrice; // Total price in dollars
-    private double tip; // Tip amount given by the customer for the order
+    private double totalGratuity; // Tip amount given by the customer for the order
+    private double totalServiceFee;
+      private double totalTax;
     private boolean inAppPayments; // Indicates if the payment was made in-app
     private String status; // Final status of the order ('claimed', 'delivered', 'canceled')
     private String terminal; // Terminal terminal identifier (A-Z)
-    private String tipsClaimed; // "NULL" (as a string) if not claimed, or the terminal's name
+    private String claimer; // "NULL" (as a string) if not claimed, or the terminal's name
 
     @Data
     @NoArgsConstructor

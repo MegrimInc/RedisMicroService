@@ -97,7 +97,7 @@ public class Order {
 
     @JsonProperty("totalServiceFee")
     public double getTotalServiceFee() {
-        return totalGratuity;
+        return totalServiceFee;
     }
 
     @JsonProperty("totalServiceFee")
