@@ -79,7 +79,7 @@ public class OrderService {
             sendOrderResponse(session, new ResponseWrapper(
                     "error",
                     null, // No data, as the merchant is closed
-                    "Failed to process order: The merchant is currently closed."));
+                    "Sorry :( This store is currently closed."));
             return;
         }
 
