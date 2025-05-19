@@ -38,8 +38,6 @@ public class TerminalController {
     }
 
     /**
-     * Example GET endpoint:  https://www.megrim.com/ws/http/checkTerminals?merchantId=123
-     *
      * Returns a string containing the list of active terminals, e.g. "AB", or "" if none.
      */
     @GetMapping("/checkTerminals")

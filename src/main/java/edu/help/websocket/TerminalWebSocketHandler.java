@@ -29,6 +29,7 @@
     import redis.clients.jedis.exceptions.JedisDataException;
     import redis.clients.jedis.params.ScanParams;
     import redis.clients.jedis.resps.ScanResult;
+    import static edu.help.config.ApiConfig.BASE_HTTP_PATH;
 
     @Component
     public class TerminalWebSocketHandler extends TextWebSocketHandler {
@@ -406,7 +407,7 @@
 
                 // Send the order to PostgreSQL
                 restTemplate.postForLocation(
-                        "http://34.230.32.169:8080/orders/save",
+                        BASE_HTTP_PATH + "/orders/save",
                         order);
 
                 Map<String, Object> data = new HashMap<>();
@@ -469,7 +470,7 @@
 
                 // Send the order to PostgreSQL
                 restTemplate.postForLocation(
-                        "http://34.230.32.169:8080/orders/save",
+                        BASE_HTTP_PATH + "/orders/save",
                         order);
 
                 Map<String, Object> data = new HashMap<>();
