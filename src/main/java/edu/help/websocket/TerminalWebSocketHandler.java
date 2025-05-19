@@ -249,11 +249,11 @@
                     WebSocketSession wsSession = sessionMap.get(sessionId);
 
                     if (wsSession != null && wsSession.isOpen()) {
-                        System.out.println("Sending update to terminal: " + terminalSession.getTerminalId());
+                        System.out.println("Sending update to terminal: " + terminalSession.getTerminal());
 
                         // Create the message using Map<String, String>
                         Map<String, String> updateMessage = new HashMap<>();
-                        updateMessage.put("updateTerminal", terminalSession.getTerminalId());
+                        updateMessage.put("updateTerminal", terminalSession.getTerminal());
                         updateMessage.put("terminalCount", String.valueOf(acceptingTerminals.size()));
                         updateMessage.put("terminalNumber", String.valueOf(i));
 
@@ -265,7 +265,7 @@
                     } else {
                         System.out.println(
                                 "WebSocket session is closed or null for terminal: "
-                                        + terminalSession.getTerminalId());
+                                        + terminalSession.getTerminal());
                     }
                 }
             } catch (Exception e) {
@@ -407,7 +407,7 @@
 
                 // Send the order to PostgreSQL
                 restTemplate.postForLocation(
-                        FULL_HTTP_PATH + "/orders/save",
+                        FULL_HTTP_PATH + "/order/save",
                         order);
 
                 Map<String, Object> data = new HashMap<>();
@@ -423,7 +423,7 @@
         public void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String cancelingTerminalId = (String) payload.get("terminal");
+            String cancelingTerminal = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -447,7 +447,7 @@
 
                 // Check if the canceling terminal is the one who claimed the order
                 String currentTerminal = order.getTerminal();
-                if (!cancelingTerminalId.equals(currentTerminal)) {
+                if (!cancelingTerminal.equals(currentTerminal)) {
                     sendErrorMessage(session, "You cannot cancel this order as it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
                     return;
@@ -470,7 +470,7 @@
 
                 // Send the order to PostgreSQL
                 restTemplate.postForLocation(
-                        FULL_HTTP_PATH + "/orders/save",
+                        FULL_HTTP_PATH + "/order/save",
                         order);
 
                 Map<String, Object> data = new HashMap<>();
@@ -486,7 +486,7 @@
         public void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String claimingTerminalId = (String) payload.get("terminal");
+            String claimingTerminal = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -539,7 +539,7 @@
                 }
 
                 // Update the order with the new claimer
-                order.setTerminal(claimingTerminalId);
+                order.setTerminal(claimingTerminal);
 
                 // Start the transaction
                 Transaction transaction = jedis.multi();
@@ -567,7 +567,7 @@
         public void handleReadyAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String readyTerminalId = (String) payload.get("terminal");
+            String readyTerminal = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -605,7 +605,7 @@
 
                 String currentTerminal = order.getTerminal();
 
-                if (!readyTerminalId.equals(currentTerminal)) {
+                if (!readyTerminal.equals(currentTerminal)) {
                     sendErrorMessage(session,
                             "You cannot mark this order as ready because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal
@@ -646,7 +646,7 @@
         public void handleUnclaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
             int merchantId = (int) payload.get("merchantId");
             int customerId = (int) payload.get("customerId");
-            String unclaimingTerminalId = (String) payload.get("terminal");
+            String unclaimingTerminal = (String) payload.get("terminal");
 
             String orderRedisKey = merchantId + "." + customerId;
 
@@ -684,7 +684,7 @@
 
                 String currentTerminal = order.getTerminal();
 
-                if (!unclaimingTerminalId.equals(currentTerminal)) {
+                if (!unclaimingTerminal.equals(currentTerminal)) {
                     sendErrorMessage(session,
                             "You cannot unclaim this order because it was claimed by another terminal.");
                     jedis.unwatch(); // Unwatch if the order was claimed by another terminal

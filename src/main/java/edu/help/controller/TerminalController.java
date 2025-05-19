@@ -87,7 +87,7 @@ public class TerminalController {
                     if (terminalSession != null && terminalSession.getActive()) {
                         // The terminalId portion is whatever comes after the dot
                         // but we can also read from terminalSession.getTerminalId()
-                        activeTerminals.add(terminalSession.getTerminalId());
+                        activeTerminals.add(terminalSession.getTerminal());
                     }
                 }
             } while (!"0".equals(cursor));

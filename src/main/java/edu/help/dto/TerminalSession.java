@@ -4,7 +4,7 @@ import java.io.Serializable;
 
 public class TerminalSession implements Serializable {
     private int merchantId;
-    private String terminalId;
+    private String terminal;
     private String sessionId;
     private boolean active;
 
@@ -13,9 +13,9 @@ public class TerminalSession implements Serializable {
     }
 
     // Constructor with parameters
-    public TerminalSession(int merchantId, String terminalId, String sessionId, boolean active) {
+    public TerminalSession(int merchantId, String terminal, String sessionId, boolean active) {
         this.merchantId = merchantId;
-        this.terminalId = terminalId;
+        this.terminal = terminal;
         this.sessionId = sessionId;
         this.active = active;
     }
@@ -29,12 +29,12 @@ public class TerminalSession implements Serializable {
         this.merchantId = merchantId;
     }
 
-    public String getTerminalId() {
-        return terminalId;
+    public String getTerminal() {
+        return terminal;
     }
 
-    public void setTerminalId(String terminalId) {
-        this.terminalId = terminalId;
+    public void setTerminal(String terminal) {
+        this.terminal = terminal;
     }
 
     public String getSessionId() {
@@ -57,7 +57,7 @@ public class TerminalSession implements Serializable {
     public String toString() {
         return "TerminalSession{" +
                 "merchantId=" + merchantId +
-                ", terminalId='" + terminalId + '\'' +
+                ", terminalId='" + terminal + '\'' +
                 ", sessionId='" + sessionId + '\'' +
                 ", active=" + active +
                 '}';
