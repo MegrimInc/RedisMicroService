@@ -7,18 +7,21 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class Order {
     private String sessionId, name, status, terminal, timestamp ; //TODO WESLEY change to string and refactor
     private int merchantId, customerId, totalPointPrice;
-    private double totalRegularPrice, tip;
+    private double totalRegularPrice, totalGratuity, totalServiceFee, totalTax;
     private boolean inAppPayments, pointOfSale;
     private List<ItemOrder> items;
 
-    public Order(String name, int merchantId, int customerId, double totalRegularPrice, int totalPointPrice, double tip, boolean inAppPayments,
+    public Order(String name, int merchantId, int customerId, double totalRegularPrice, int totalPointPrice, double totalGratuity, double totalServiceFee, double totalTax, boolean inAppPayments,
             List<ItemOrder> items, boolean pointOfSale, String status, String terminal, String timestamp, String sessionId) {
         this.name = name;
         this.merchantId = merchantId;
         this.customerId = customerId;
         this.totalRegularPrice = totalRegularPrice;
         this.totalPointPrice = totalPointPrice; 
-        this.tip = tip; 
+        this.totalGratuity = totalGratuity;
+        this.totalGratuity = totalGratuity;
+        this.totalServiceFee = totalServiceFee;
+        this.totalTax = totalTax; 
         this.inAppPayments = inAppPayments;
         this.items = items;
         this.pointOfSale = pointOfSale;
@@ -39,7 +42,9 @@ public class Order {
                 ", customerId=" + customerId +
                 ", totalRegularPrice=" + totalRegularPrice +
                 ", totalPointPrice=" + totalPointPrice +
-                ", tip=" + tip + // Updated toString
+                ", totalGratuity=" + totalGratuity +
+                ", totalServiceFee=" + totalServiceFee +
+                ", totalTax=" + totalTax + 
                 ", inAppPayments=" + inAppPayments +
                 ", items=" + items +
                 ", status='" + status + '\'' +
@@ -80,16 +85,35 @@ public class Order {
         this.totalRegularPrice = totalRegularPrice;
     }
 
-    @JsonProperty("tip")
-    public double getTip() {
-        return tip;
+    @JsonProperty("totalGratuity")
+    public double getTotalGratuity() {
+        return totalGratuity;
     }
 
-    @JsonProperty("tip")
-    public void setTip(double tip) {
-        this.tip = tip;
+    @JsonProperty("totalGrauity")
+    public void setTotalGratuity(double totalGratuity) {
+        this.totalGratuity = totalGratuity;
     }
 
+    @JsonProperty("totalServiceFee")
+    public double getTotalServiceFee() {
+        return totalGratuity;
+    }
+
+    @JsonProperty("totalServiceFee")
+    public void setTotalServiceFee(double totalServiceFee) {
+        this.totalServiceFee = totalServiceFee;
+    }
+
+    @JsonProperty("totalTax")
+    public double getTotalTax() {
+        return totalTax;
+    }
+
+    @JsonProperty("totalTax")
+    public void setTotalTax(double totalTax) {
+        this.totalTax = totalTax;
+    }
 
     @JsonProperty("inAppPayments")
     public boolean isInAppPayments() {

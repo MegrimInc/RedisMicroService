@@ -4,7 +4,7 @@ import java.util.List;
 
 public class OrderResponse {
     private String message, name, messageType;
-    private double totalPrice, tip;
+    private double totalPrice, totalGratuity, totalServiceFee, totalTax;
     private List<ItemOrder> items;
     private int totalPointPrice;
     // And also we will need to check on the frontend how it works.
@@ -12,20 +12,24 @@ public class OrderResponse {
         // Default constructor
     }
 
-    public OrderResponse(String name, String message, double totalPrice, double tip, List<ItemOrder> items, String messageType, int totalPointPrice) {
+    public OrderResponse(String name, String message, double totalPrice, double totalGratuity, double totalServiceFee, double totalTax, List<ItemOrder> items, String messageType, int totalPointPrice) {
         this.message = message;
         this.totalPrice = totalPrice;
-        this.tip = tip; // Updated initialization
+        this.totalGratuity = totalGratuity; // Updated initialization
+        this.totalServiceFee = totalServiceFee;
+        this.totalTax = totalTax;
         this.items = items;
         this.messageType = messageType;
         this.totalPointPrice = totalPointPrice;
         this.name = name;
     }
 
-    public OrderResponse(String name, String message, double totalPrice, double tip, List<ItemOrder> items, int totalPointPrice) {
+    public OrderResponse(String name, String message, double totalPrice,  double totalGratuity, double totalServiceFee, double totalTax, List<ItemOrder> items, int totalPointPrice) {
         this.message = message;
         this.totalPrice = totalPrice;
-        this.tip = tip; // Updated initialization
+        this.totalGratuity = totalGratuity; // Updated initialization
+        this.totalServiceFee = totalServiceFee;
+        this.totalTax = totalTax;
         this.items = items;
         this.messageType = "";
         this.totalPointPrice = totalPointPrice;
@@ -55,12 +59,29 @@ public class OrderResponse {
         this.totalPrice = totalPrice;
     }
 
-    public double getTip() {
-        return tip;
+    public double getTotalGratuity() {
+        return totalGratuity;
     }
 
-    public void setTip(double tip) {
-        this.tip = tip;
+    public void setTotalGratuity(double totalGratuity) {
+        this.totalGratuity = totalGratuity;
+    }
+
+
+     public double getTotalServiceFee() {
+        return totalServiceFee;
+    }
+
+    public void setTotalServiceFee(double totalServiceFee) {
+        this.totalServiceFee = totalServiceFee;
+    }
+
+     public double getTotalTax() {
+        return totalTax;
+    }
+
+    public void setTotalTax(double totalTax) {
+        this.totalTax = totalTax;
     }
 
     public List<ItemOrder> getItems() {

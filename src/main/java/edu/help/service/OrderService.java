@@ -162,7 +162,9 @@ public class OrderService {
                     orderRequest.getCustomerId(),
                     orderResponse.getTotalPrice(), // Using the total price from the response
                     orderResponse.getTotalPointPrice(),
-                    orderResponse.getTip(),
+                    orderResponse.getTotalGratuity(),
+                    orderResponse.getTotalServiceFee(),
+                    orderResponse.getTotalTax(),
                     orderRequest.isInAppPayments(), // Assuming this is from the request
                     convertItemsToOrders(orderResponse.getItems()),
                     pointOfSale,
