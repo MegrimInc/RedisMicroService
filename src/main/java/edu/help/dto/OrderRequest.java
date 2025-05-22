@@ -23,6 +23,7 @@ public class OrderRequest {
                 ", items=" + items +
                 ", isDiscount=" + isDiscount +
                 ", terminal=" + terminal +
+                ", password=" + password +
                 '}';
     }
 
