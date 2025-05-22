@@ -13,6 +13,7 @@ public class OrderRequest {
     private boolean isDiscount;
     @Nullable
     private String terminal;
+    private String password;
 
     @Override
     public String toString() {
