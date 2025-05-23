@@ -5,7 +5,7 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 //This is the same as https://github.com/MegrimLLC/frontend/blob/0.0.0/lib/backend/customerorder2.dart
 public class Order {
-    private String sessionId, name, status, terminal, timestamp ; //TODO WESLEY change to string and refactor
+    private String sessionId, name, status, terminal, timestamp; 
     private int merchantId, customerId, totalPointPrice;
     private double totalRegularPrice, totalGratuity, totalServiceFee, totalTax;
     private boolean inAppPayments, pointOfSale;

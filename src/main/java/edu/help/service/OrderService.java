@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -27,7 +27,6 @@ import edu.help.websocket.TerminalWebSocketHandler;
 import edu.help.websocket.OrderWebSocketHandler;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPooled;
-
 
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -70,16 +69,24 @@ public class OrderService {
             return;
         }
 
-        // Fetch open and happyHour status from Redis
-        String merchantKey = String.valueOf(orderRequest.getMerchantId());
-        Boolean isOpen = Boolean.valueOf(jedisPooled.hget(merchantKey, "open"));
+        //CHECKS IF THE MERCHANT IS OPEN OR CLOSED 
+        try {
+            String url = FULL_HTTP_PATH + "/customer/isMerchantOpen/" + orderRequest.getMerchantId();
+            ResponseEntity<Boolean> response = restTemplate.getForEntity(url, Boolean.class);
 
-        // Check if the merchant is open
-        if (isOpen == null || !isOpen) {
+            if (!Boolean.TRUE.equals(response.getBody())) {
+                sendOrderResponse(session, new ResponseWrapper(
+                        "error",
+                        null,
+                        "Sorry :( This store is currently closed."));
+                return;
+            }
+        } catch (RestClientException e) {
+            e.printStackTrace();
             sendOrderResponse(session, new ResponseWrapper(
                     "error",
-                    null, // No data, as the merchant is closed
-                    "Sorry :( This store is currently closed."));
+                    null,
+                    "Unable to verify store status. Please try again later."));
             return;
         }
 
@@ -165,7 +172,8 @@ public class OrderService {
                 }
 
                 Order order = new Order(
-                        orderResponse.getName(), //HERE IS WHERE YOU NEED TO REPLACE THE ORDER Id WITH SOMETHING GENERATED
+                        orderResponse.getName(), // HERE IS WHERE YOU NEED TO REPLACE THE ORDER Id WITH SOMETHING
+                                                 // GENERATED
                         orderRequest.getMerchantId(),
                         orderRequest.getCustomerId(),
                         orderResponse.getTotalPrice(), // Using the total price from the response
@@ -191,7 +199,7 @@ public class OrderService {
                             order,
                             "Order successfully processed."));
 
-                    //OrderWebSocketHandler.getInstance().sendCreateNotification(orderRequest);
+                    // OrderWebSocketHandler.getInstance().sendCreateNotification(orderRequest);
 
                     // Broadcast the order to terminals
                     Map<String, Object> data = new HashMap<>();
