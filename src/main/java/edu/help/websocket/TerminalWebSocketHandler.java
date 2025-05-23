@@ -821,19 +821,20 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
                 session.sendMessage(new TextMessage("{\"orders\":[]}"));
             }
 
-            String merchantStatus = jedis.hget(String.valueOf(merchantId), "open");
+            try {
+                String url = FULL_HTTP_PATH + "/order/isMerchantOpen?merchantId=" + merchantId;
+                String response = restTemplate.postForObject(url, null, String.class);
 
-            if (merchantStatus != null) {
-                boolean status = merchantStatus.equals("true");
+                // Extract boolean value from response string
+                boolean isOpen = response != null && response.toLowerCase().contains("true");
 
                 JSONObject openOrClosed = new JSONObject();
-                openOrClosed.put("merchantStatus", status);
-
+                openOrClosed.put("merchantStatus", isOpen);
                 session.sendMessage(new TextMessage(openOrClosed.toString()));
-                System.out.println("Sent merchant status to session: " + session.getId());
-            } else {
-                // Send an error or default status if happy hour status is not found
-                sendErrorMessage(session, "Failed to retrieve merchant status.");
+                System.out.println("Sent merchant status via API to session: " + session.getId());
+            } catch (Exception e) {
+                e.printStackTrace();
+                sendErrorMessage(session, "Failed to retrieve merchant status from server.");
             }
 
         } catch (Exception e) {
