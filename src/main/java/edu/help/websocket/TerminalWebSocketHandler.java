@@ -446,22 +446,6 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
                 session.sendMessage(new TextMessage("{\"orders\":[]}"));
             }
 
-            try {
-                String url = FULL_HTTP_PATH + "/order/isMerchantOpen?merchantId=" + merchantId;
-                String response = restTemplate.postForObject(url, null, String.class);
-
-                // Extract boolean value from response string
-                boolean isOpen = response != null && response.toLowerCase().contains("true");
-
-                JSONObject openOrClosed = new JSONObject();
-                openOrClosed.put("merchantStatus", isOpen);
-                session.sendMessage(new TextMessage(openOrClosed.toString()));
-                System.out.println("Sent merchant status via API to session: " + session.getId());
-            } catch (Exception e) {
-                e.printStackTrace();
-                sendErrorMessage(session, "Failed to retrieve merchant status from server.");
-            }
-
         } catch (Exception e) {
             e.printStackTrace(); // Handle exceptions
             sendErrorMessage(session, "Error retrieving orders");
