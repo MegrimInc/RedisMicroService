@@ -16,6 +16,7 @@ public class Order {
         this.name = name;
         this.merchantId = merchantId;
         this.customerId = customerId;
+        this.employeeId = employeeId;
         this.totalRegularPrice = totalRegularPrice;
         this.totalPointPrice = totalPointPrice; 
         this.totalGratuity = totalGratuity;

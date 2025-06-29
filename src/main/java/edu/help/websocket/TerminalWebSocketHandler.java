@@ -364,15 +364,17 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
     @Transactional
     public void handleRefreshAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int merchantId = (int) payload.get("merchantId");
+        int employeeId = (int) payload.get("employeeId");
 
         try (Jedis jedis = jedisPool.getResource()) {
+            String keyPattern = merchantId + "." + employeeId + ".*";
             // Prepare to scan Redis for keys matching the pattern
-            ScanParams scanParams = new ScanParams().match(merchantId + ".*");
+            ScanParams scanParams = new ScanParams().match(keyPattern);
             String cursor = "0";
 
             List<Order> orders = new ArrayList<>();
 
-            System.out.println("Scanning Redis with pattern: " + merchantId + ".*");
+            System.out.println("Scanning Redis with pattern: " + keyPattern);
             System.out.println("Initial cursor value: " + cursor);
 
             do {
@@ -387,13 +389,10 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
                     System.out.println(" - " + key);
                 }
 
-                // Process each key, but only if it matches the format merchantId.# (where # is
-                // a number)
                 for (String key : keys) {
                     // Match the format merchantId.# and ensure the part after the dot is entirely
                     // numeric
-                    if (key.matches(merchantId + "\\.\\d+")) { // This regex matches merchantId.# where # is one or more
-                                                               // digits
+                    if (key.matches(merchantId + "\\." + employeeId + "\\.\\d+")) {
                         try {
                             // Retrieve the JSON object from Redis
                             Object orderJsonObj = jedisPooled.jsonGet(key);
