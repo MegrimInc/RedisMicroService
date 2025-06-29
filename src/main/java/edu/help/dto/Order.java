@@ -5,14 +5,14 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 //This is the same as https://github.com/MegrimLLC/frontend/blob/0.0.0/lib/backend/customerorder2.dart
 public class Order {
-    private String sessionId, name, status, terminal, timestamp; 
-    private int merchantId, customerId, totalPointPrice;
+    private String sessionId, name, status, timestamp, pointOfSale; 
+    private int merchantId, customerId, totalPointPrice, employeeId;
     private double totalRegularPrice, totalGratuity, totalServiceFee, totalTax;
-    private boolean inAppPayments, pointOfSale;
+    private boolean inAppPayments;
     private List<ItemOrder> items;
 
-    public Order(String name, int merchantId, int customerId, double totalRegularPrice, int totalPointPrice, double totalGratuity, double totalServiceFee, double totalTax, boolean inAppPayments,
-            List<ItemOrder> items, boolean pointOfSale, String status, String terminal, String timestamp, String sessionId) {
+    public Order(String name, int merchantId, int customerId, int employeeId, double totalRegularPrice, int totalPointPrice, double totalGratuity, double totalServiceFee, double totalTax, boolean inAppPayments,
+            List<ItemOrder> items, String pointOfSale, String status, String timestamp, String sessionId) {
         this.name = name;
         this.merchantId = merchantId;
         this.customerId = customerId;
@@ -26,7 +26,6 @@ public class Order {
         this.items = items;
         this.pointOfSale = pointOfSale;
         this.status = status;
-        this.terminal = terminal;
         this.timestamp = timestamp;
         this.sessionId = sessionId;
     }
@@ -48,9 +47,10 @@ public class Order {
                 ", inAppPayments=" + inAppPayments +
                 ", items=" + items +
                 ", status='" + status + '\'' +
-                ", terminal='" + terminal + '\'' +
+                ", pointOfSale='" + pointOfSale + '\'' +
                 ", timestamp='" + timestamp + '\'' +
                 ", sessionId='" + sessionId + '\'' +
+                ", employeeId='" + employeeId + '\'' +
                 '}';
     }
 
@@ -136,12 +136,12 @@ public class Order {
     }
 
     @JsonProperty("pointOfSale")
-    public boolean isPointOfSale() {
+    public String getPointOfSale() {
         return pointOfSale;
     }
 
     @JsonProperty("pointOfSale")
-    public void setPointOfSale(boolean pointOfSale) {
+    public void setPointOfSale(String pointOfSale) {
         this.pointOfSale = pointOfSale;
     }
 
@@ -155,14 +155,14 @@ public class Order {
         this.status = status;
     }
 
-    @JsonProperty("terminal")
-    public String getTerminal() {
-        return terminal;
+    @JsonProperty("employeeId")
+    public int getEmployeeId() {
+        return employeeId;
     }
 
-    @JsonProperty("terminal")
-    public void setTerminal(String terminal) {
-        this.terminal = terminal;
+    @JsonProperty("employeeId")
+    public void setEmployeeId(int employeeId) {
+        this.employeeId = employeeId;
     }
 
     @JsonProperty("timestamp")

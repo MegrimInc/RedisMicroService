@@ -28,5 +28,7 @@ public class WebSocketController implements WebSocketConfigurer {
                 .setAllowedOrigins("*");
         registry.addHandler(terminalWebSocketHandler, BASE_WS_PATH + "/terminals")
                 .setAllowedOrigins("*");
+                registry.addHandler(terminalWebSocketHandler, BASE_WS_PATH + "/messages")
+                .setAllowedOrigins("*");
     }
 }

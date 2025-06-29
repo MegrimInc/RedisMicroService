@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -38,13 +37,10 @@ public class OrderService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final JedisPooled jedisPooled; // Redis client for simple operations
-    private final JedisPool jedisPool; // Redis connection pool for transactions
 
     public OrderService(RestTemplate restTemplate, JedisPooled jedisPooled, JedisPool jedisPool) {
         this.restTemplate = restTemplate;
         this.jedisPooled = jedisPooled;
-        this.jedisPool = jedisPool;
-
     }
 
     public void processOrder(OrderRequest orderRequest, WebSocketSession session) {
@@ -66,27 +62,6 @@ public class OrderService {
 
             // Send error response and exit
             sendOrderResponse(session, new ResponseWrapper("error", null, message));
-            return;
-        }
-
-        //CHECKS IF THE MERCHANT IS OPEN OR CLOSED 
-        try {
-            String url = FULL_HTTP_PATH + "/customer/isMerchantOpen/" + orderRequest.getMerchantId();
-            ResponseEntity<Boolean> response = restTemplate.getForEntity(url, Boolean.class);
-
-            if (!Boolean.TRUE.equals(response.getBody())) {
-                sendOrderResponse(session, new ResponseWrapper(
-                        "error",
-                        null,
-                        "Sorry :( This store is currently closed."));
-                return;
-            }
-        } catch (RestClientException e) {
-            e.printStackTrace();
-            sendOrderResponse(session, new ResponseWrapper(
-                    "error",
-                    null,
-                    "Unable to verify store status. Please try again later."));
             return;
         }
 
@@ -162,20 +137,11 @@ public class OrderService {
             }
 
             if (orderResponse != null) {
-                String status = "unready";
-                String claimer = "";
-                boolean pointOfSale = false;
-                if (orderRequest.getTerminal() != null && !orderRequest.getTerminal().isEmpty()) {
-                    status = "arrived";
-                    claimer = orderRequest.getTerminal();
-                    pointOfSale = true;
-                }
-
                 Order order = new Order(
-                        orderResponse.getName(), // HERE IS WHERE YOU NEED TO REPLACE THE ORDER Id WITH SOMETHING
-                                                 // GENERATED
+                        orderResponse.getName(),                   
                         orderRequest.getMerchantId(),
                         orderRequest.getCustomerId(),
+                        orderRequest.getEmployeeId(),
                         orderResponse.getTotalPrice(), // Using the total price from the response
                         orderResponse.getTotalPointPrice(),
                         orderResponse.getTotalGratuity(),
@@ -183,9 +149,8 @@ public class OrderService {
                         orderResponse.getTotalTax(),
                         orderResponse.isInAppPayments(), // Assuming this is from the request
                         convertItemsToOrders(orderResponse.getItems()),
-                        pointOfSale,
-                        status,
-                        claimer,
+                        orderRequest.getPointOfSale(),
+                        "unready",
                         getCurrentTimestamp(),
                         session.getId());
 
@@ -205,7 +170,7 @@ public class OrderService {
                     Map<String, Object> data = new HashMap<>();
                     data.put("orders", Collections.singletonList(order));
                     try {
-                        TerminalWebSocketHandler.getInstance().broadcastToMerchant(orderRequest.getMerchantId(), data);
+                        TerminalWebSocketHandler.getInstance().broadcastToEmployee(orderRequest.getEmployeeId(), data);
                         System.out.println("Sent order to terminal");
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -238,9 +203,13 @@ public class OrderService {
                 .toList();
     }
 
-    private String generateOrderKey(OrderRequest orderRequest) {
-        return String.format("%d.%d", orderRequest.getMerchantId(), orderRequest.getCustomerId());
-    }
+   private String generateOrderKey(OrderRequest orderRequest) {
+    return String.format("%d.%d.%d",
+        orderRequest.getMerchantId(),
+        orderRequest.getEmployeeId(),
+        orderRequest.getCustomerId()
+    );
+}
 
     private void sendOrderResponse(WebSocketSession session, ResponseWrapper responseWrapper) {
         try {
@@ -272,7 +241,7 @@ public class OrderService {
     }
 
     public void refreshOrdersForCustomer(int customerId, WebSocketSession session) {
-        ScanParams scanParams = new ScanParams().match("*." + customerId);
+        ScanParams scanParams = new ScanParams().match("*.*." + customerId);
         String cursor = "0";
         List<Order> orders = new ArrayList<>();
 
@@ -336,12 +305,11 @@ public class OrderService {
         }
     }
 
-    public void arriveOrder(WebSocketSession session, int merchantId, int customerId) {
+    public void arriveOrder(WebSocketSession session, int merchantId, int customerId, int employeeId) {
 
         System.out.println("ArrivingOrder order for merchantId: " + merchantId);
 
-        // Fetch open and happyHour status from Redis
-        String orderKey = merchantId + "." + customerId;
+        String orderKey = merchantId + "." + employeeId + "." + customerId;
         Order existingOrder = null;
 
         System.out.println("Parsed order key: " + orderKey);
@@ -410,13 +378,13 @@ public class OrderService {
                     existingOrder,
                     "Marked as arrived."));
 
-            OrderWebSocketHandler.getInstance().sendArrivedNotification(customerId, existingOrder.getTerminal());
+            OrderWebSocketHandler.getInstance().sendArrivedNotification(customerId, existingOrder.getEmployeeId());
 
             // Broadcast the order to terminals
             Map<String, Object> data = new HashMap<>();
             data.put("orders", Collections.singletonList(existingOrder));
             try {
-                TerminalWebSocketHandler.getInstance().broadcastToMerchant(existingOrder.getMerchantId(), data);
+                TerminalWebSocketHandler.getInstance().broadcastToEmployee(existingOrder.getEmployeeId(), data);
                 System.out.println("Notified Terminals that person is arrived");
             } catch (IOException e) {
                 e.printStackTrace();

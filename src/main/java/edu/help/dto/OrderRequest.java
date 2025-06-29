@@ -1,6 +1,4 @@
 package edu.help.dto;
-
-import jakarta.annotation.Nullable;
 import lombok.Data;
 
 import java.util.List;
@@ -11,8 +9,8 @@ public class OrderRequest {
     private int customerId;
     private List<ItemOrder> items;
     private boolean isDiscount;
-    @Nullable
-    private String terminal;
+    private int employeeId;
+    private String pointOfSale;
     private String password;
 
     @Override
@@ -22,7 +20,8 @@ public class OrderRequest {
                 ", customerId=" + customerId +
                 ", items=" + items +
                 ", isDiscount=" + isDiscount +
-                ", terminal=" + terminal +
+                ", employeeId=" + employeeId +
+                ", pointOfSale=" + pointOfSale +
                 ", password=" + password +
                 '}';
     }

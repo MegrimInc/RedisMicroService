@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.json.JSONObject;
@@ -84,14 +83,6 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
                     handleRefreshAction(session, payloadMap);
                     break;
 
-                case "claim":
-                    handleClaimAction(session, payloadMap);
-                    break;
-
-                case "unclaim":
-                    handleUnclaimAction(session, payloadMap);
-                    break;
-
                 case "ready":
                     handleReadyAction(session, payloadMap);
                     break;
@@ -104,31 +95,6 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
                     handleCancelAction(session, payloadMap);
                     break;
 
-                case "disable":
-                    handleDisableAction(session, payloadMap);
-                    break;
-
-                case "open":
-                case "close": {
-                    int merchantId = (int) payloadMap.get("merchantId");
-                    boolean isOpen = action.equals("open");
-
-                    try {
-                        String url = FULL_HTTP_PATH + "/order/isMerchantOpen?merchantId=" + merchantId + "&isOpen="
-                                + isOpen;
-                        restTemplate.postForObject(url, null, String.class);
-
-                        // Notify all terminals of the status update
-                        Map<String, Object> statusPayload = new HashMap<>();
-                        statusPayload.put("merchantStatus", isOpen);
-                        broadcastToMerchant(merchantId, statusPayload);
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        sendErrorMessage(session, "Failed to update merchant open status: " + e.getMessage());
-                    }
-                    break;
-                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -142,102 +108,17 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
         session.sendMessage(new TextMessage(response.toString()));
     }
 
-    private void notifyTerminalsOfActiveConnections(int merchantId) {
-        System.out.println("notifyTerminalsOfActiveConnections triggered with merchantId: " + merchantId);
-
-        String pattern = merchantId + ".[a-zA-Z]*";
-        System.out.println("Searching for keys with pattern Id: " + pattern);
-
-        try (Jedis jedis = jedisPool.getResource()) {
-            // Find all terminal keys for the given merchantId
-            Set<String> terminalKeys = jedis.keys(pattern);
-            System.out.println("Found terminal keys: " + terminalKeys);
-
-            // Filter terminals with getActive() == true and where terminal is alphabetic
-            List<TerminalSession> acceptingTerminals = new ArrayList<>();
-            for (String key : terminalKeys) {
-                System.out.println("Processing key: " + key);
-                String[] parts = key.split("\\.");
-                if (parts.length != 2) {
-                    System.out.println("Invalid key format: " + key);
-                    continue;
-                }
-
-                String terminal = parts[1];
-                System.out.println("Found terminal: " + terminal);
-                if (terminal.matches("[a-zA-Z]+")) { // Ensure terminal is alphabetic
-                    TerminalSession terminalSession = null;
-                    try {
-                        // Deserialize the stored JSON into a TerminalSession object
-                        terminalSession = jedisPooled.jsonGet(key, TerminalSession.class);
-                        System.out.println("Deserialized TerminalSession: " + terminalSession);
-                    } catch (Exception e) {
-                        System.out.println("Failed to deserialize key: " + key);
-                        e.printStackTrace();
-                        continue; // Skip if deserialization fails
-                    }
-
-                    if (terminalSession != null && terminalSession.getActive()) { // Changed from isActive() to
-                                                                                  // getActive()
-                        System.out.println("Terminal is active: " + terminal);
-                        acceptingTerminals.add(terminalSession);
-                    }
-                }
-            }
-
-            System.out.println("Total terminals active: " + acceptingTerminals.size());
-
-            // Send a message to each terminal
-            for (int i = 0; i < acceptingTerminals.size(); i++) {
-                TerminalSession terminalSession = acceptingTerminals.get(i);
-                String sessionId = terminalSession.getSessionId();
-                WebSocketSession wsSession = sessionMap.get(sessionId);
-
-                if (wsSession != null && wsSession.isOpen()) {
-                    System.out.println("Sending update to terminal: " + terminalSession.getTerminal());
-
-                    // Create the message using Map<String, String>
-                    Map<String, String> updateMessage = new HashMap<>();
-                    updateMessage.put("updateTerminal", terminalSession.getTerminal());
-                    updateMessage.put("terminalCount", String.valueOf(acceptingTerminals.size()));
-                    updateMessage.put("terminalNumber", String.valueOf(i));
-
-                    // Convert the map to a JSON string using ObjectMapper
-                    String jsonMessage = objectMapper.writeValueAsString(updateMessage);
-
-                    // Send the message to the WebSocket session
-                    wsSession.sendMessage(new TextMessage(jsonMessage));
-                } else {
-                    System.out.println(
-                            "WebSocket session is closed or null for terminal: "
-                                    + terminalSession.getTerminal());
-                }
-            }
-        } catch (Exception e) {
-            // Handle exceptions, such as JSON processing or WebSocket issues
-            System.out.println("Exception in notifyTerminalsOfActiveConnections: ");
-            e.printStackTrace();
-        }
-    }
-
     @Transactional
     public void handleInitializeAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
 
         int merchantId = (int) payload.get("merchantId");
-        String terminal = (String) payload.get("terminal");
+        int employeeId = (int) payload.get("employeeId");
 
-        System.out.println("Received terminal: " + terminal);
+        System.out.println("Received employeeId: " + employeeId);
         System.out.println("Received merchantId: " + merchantId);
 
-        if (terminal == null || terminal.isEmpty() || !terminal.matches("[a-zA-Z]+")) {
-            // Send an error response
-            sendErrorMessage(session,
-                    "Initialization Failed: Invalid terminal. It must be non-empty and contain only alphabetic characters.");
-            return;
-        }
-
         // Create the Redis key
-        String redisKey = merchantId + "." + terminal;
+        String redisKey = String.valueOf(employeeId);
 
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.watch(redisKey); // Watch the key for changes
@@ -261,12 +142,12 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
                     terminateMessage.put("terminate", true);
                     existingWsSession.sendMessage(new TextMessage(terminateMessage.toString()));
                     existingWsSession.close();
-                    System.out.println("Closing the connection for..." + terminal);
+                    System.out.println("Closing the connection for..." + employeeId);
                 }
             }
 
             // Store the new session in Redis and in the session map
-            TerminalSession newSession = new TerminalSession(merchantId, terminal, session.getId(), true);
+            TerminalSession newSession = new TerminalSession(merchantId, employeeId, session.getId());
 
             Transaction transaction = jedis.multi(); // Start the transaction
             System.out.println("Attempting to execute Redis transaction...");
@@ -285,10 +166,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
             sessionMap.put(session.getId(), session); // Store the session in the session map
             System.out.println("TerminalSession stored in Redis: " + session);
-            session.sendMessage(new TextMessage("Initialization successful for terminal " + terminal));
-
-            // Notify each terminal of active WebSocket connections
-            notifyTerminalsOfActiveConnections(merchantId);
+            session.sendMessage(new TextMessage("Initialization successful for employee " + employeeId));
             handleRefreshAction(session, payload);
 
         }
@@ -298,9 +176,9 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
     public void handleDeliverAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int merchantId = (int) payload.get("merchantId");
         int customerId = (int) payload.get("customerId");
-        String terminal = (String) payload.get("terminal");
+        int employeeId = (int) payload.get("employeeId");
 
-        String orderRedisKey = merchantId + "." + customerId;
+        String orderRedisKey = merchantId + "." + employeeId + "." + customerId;
 
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.watch(orderRedisKey); // Watch the key for changes
@@ -319,15 +197,6 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
             // Deserialize the JSON string into an Order object
             Order order = objectMapper.readValue(orderJson, Order.class);
-
-            String currentTerminal = order.getTerminal();
-
-            if (!terminal.equals(currentTerminal)) {
-                sendErrorMessage(session,
-                        "You cannot deliver this order because it was claimed by another terminal.");
-                jedis.unwatch(); // Unwatch if the order was claimed by another terminal
-                return;
-            }
 
             String currentStatus = order.getStatus();
 
@@ -358,7 +227,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
             Map<String, Object> data = new HashMap<>();
             data.put("update", Collections.singletonList(order));
 
-            broadcastToMerchant(merchantId, data);
+            broadcastToEmployee(employeeId, data);
 
             orderWebSocketHandler.updateCustomer(order);
         }
@@ -368,9 +237,9 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
     public void handleCancelAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int merchantId = (int) payload.get("merchantId");
         int customerId = (int) payload.get("customerId");
-        String cancelingTerminal = (String) payload.get("terminal");
+        int employeeId = (int) payload.get("employeeId");
 
-        String orderRedisKey = merchantId + "." + customerId;
+        String orderRedisKey = merchantId + "." + employeeId + "." + customerId;
 
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.watch(orderRedisKey); // Watch the key for changes
@@ -389,14 +258,6 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
             // Deserialize the JSON string into an Order object
             Order order = objectMapper.readValue(orderJson, Order.class);
-
-            // Check if the canceling terminal is the one who claimed the order
-            String currentTerminal = order.getTerminal();
-            if (!cancelingTerminal.equals(currentTerminal)) {
-                sendErrorMessage(session, "You cannot cancel this order as it was claimed by another terminal.");
-                jedis.unwatch(); // Unwatch if the order was claimed by another terminal
-                return;
-            }
 
             // Update the order status to "canceled"
             order.setStatus("canceled");
@@ -421,90 +282,8 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
             Map<String, Object> data = new HashMap<>();
             data.put("update", Collections.singletonList(order));
 
-            broadcastToMerchant(merchantId, data);
-
+            broadcastToEmployee(employeeId, data);
             orderWebSocketHandler.updateCustomer(order);
-        }
-    }
-
-    @Transactional
-    public void handleClaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-        int merchantId = (int) payload.get("merchantId");
-        int customerId = (int) payload.get("customerId");
-        String claimingTerminal = (String) payload.get("terminal");
-
-        String orderRedisKey = merchantId + "." + customerId;
-
-        try (Jedis jedis = jedisPool.getResource()) {
-            jedis.watch(orderRedisKey); // Watch the key for changes
-
-            // Retrieve the JSON object from Redis
-            Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
-
-            if (orderJsonObj == null) {
-                sendErrorMessage(session, "Order does not exist.");
-                jedis.unwatch(); // Unwatch if the order doesn't exist
-                return;
-            }
-
-            // Convert the retrieved Object to a JSON string
-            String orderJson;
-            try {
-                orderJson = objectMapper.writeValueAsString(orderJsonObj);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process order data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            // Deserialize the JSON string into an Order object
-            Order order;
-            try {
-                order = objectMapper.readValue(orderJson, Order.class);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process order data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            // Check if the order is already claimed
-            String currentTerminal = order.getTerminal();
-            if (currentTerminal != null && !currentTerminal.isEmpty()) {
-                sendErrorMessage(session, "Order is already claimed.");
-                jedis.unwatch(); // Unwatch if the order is already claimed
-                return;
-            }
-
-            // Check if the order is canceled
-            String currentStatus = order.getStatus();
-            if ("canceled".equals(currentStatus)) {
-                sendErrorMessage(session, "You cannot claim a canceled order.");
-                jedis.unwatch(); // Unwatch if the order is canceled
-                return;
-            }
-
-            // Update the order with the new claimer
-            order.setTerminal(claimingTerminal);
-
-            // Start the transaction
-            Transaction transaction = jedis.multi();
-            // Serialize the updated Order object back to JSON and save it to Redis
-            String updatedOrderJson = objectMapper.writeValueAsString(order);
-            transaction.jsonSet(orderRedisKey, updatedOrderJson);
-            List<Object> results = transaction.exec(); // Execute the transaction
-
-            if (results == null || results.isEmpty()) {
-                sendErrorMessage(session, "Failed to claim the order due to a conflict. Please try again.");
-                return;
-            }
-
-            Map<String, Object> data = new HashMap<>();
-            data.put("update", Collections.singletonList(order));
-
-            broadcastToMerchant(merchantId, data);
-
-            orderWebSocketHandler.updateCustomer(order);
-
         }
     }
 
@@ -512,9 +291,9 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
     public void handleReadyAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
         int merchantId = (int) payload.get("merchantId");
         int customerId = (int) payload.get("customerId");
-        String readyTerminal = (String) payload.get("terminal");
+        int employeeId = (int) payload.get("employeeId");
 
-        String orderRedisKey = merchantId + "." + customerId;
+        String orderRedisKey = merchantId + "." + employeeId + "." + customerId;
 
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.watch(orderRedisKey); // Watch the key for changes
@@ -545,15 +324,6 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
             } catch (JsonProcessingException e) {
                 sendErrorMessage(session, "Failed to process order data.");
                 jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            String currentTerminal = order.getTerminal();
-
-            if (!readyTerminal.equals(currentTerminal)) {
-                sendErrorMessage(session,
-                        "You cannot mark this order as ready because it was claimed by another terminal.");
-                jedis.unwatch(); // Unwatch if the order was claimed by another terminal
                 return;
             }
 
@@ -580,153 +350,8 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
             Map<String, Object> data = new HashMap<>();
             data.put("update", Collections.singletonList(order));
-
-            broadcastToMerchant(merchantId, data);
-
+            broadcastToEmployee(employeeId, data);
             orderWebSocketHandler.updateCustomer(order);
-        }
-    }
-
-    @Transactional
-    public void handleUnclaimAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-        int merchantId = (int) payload.get("merchantId");
-        int customerId = (int) payload.get("customerId");
-        String unclaimingTerminal = (String) payload.get("terminal");
-
-        String orderRedisKey = merchantId + "." + customerId;
-
-        try (Jedis jedis = jedisPool.getResource()) {
-            jedis.watch(orderRedisKey); // Watch the key for changes
-
-            // Retrieve the JSON object from Redis
-            Object orderJsonObj = jedisPooled.jsonGet(orderRedisKey);
-
-            if (orderJsonObj == null) {
-                sendErrorMessage(session, "Order does not exist.");
-                jedis.unwatch(); // Unwatch if the order doesn't exist
-                return;
-            }
-
-            // Convert the retrieved Object to a JSON string
-            String orderJson;
-            try {
-                orderJson = objectMapper.writeValueAsString(orderJsonObj);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process order data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            // Deserialize the JSON string into an Order object
-            Order order;
-            try {
-                order = objectMapper.readValue(orderJson, Order.class);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process order data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            String currentTerminal = order.getTerminal();
-
-            if (!unclaimingTerminal.equals(currentTerminal)) {
-                sendErrorMessage(session,
-                        "You cannot unclaim this order because it was claimed by another terminal.");
-                jedis.unwatch(); // Unwatch if the order was claimed by another terminal
-                return;
-            }
-
-            // Update the order to remove the claimer
-            order.setTerminal("");
-
-            Transaction transaction = jedis.multi(); // Start the transaction
-            String updatedOrderJson = objectMapper.writeValueAsString(order);
-            transaction.jsonSet(orderRedisKey, updatedOrderJson);
-            List<Object> results = transaction.exec(); // Execute the transaction
-
-            if (results == null || results.isEmpty()) {
-                sendErrorMessage(session, "Failed to unclaim the order due to a conflict. Please try again.");
-                return;
-            }
-
-            Map<String, Object> data = new HashMap<>();
-            data.put("update", Collections.singletonList(order));
-
-            broadcastToMerchant(merchantId, data);
-
-            orderWebSocketHandler.updateCustomer(order);
-        }
-    }
-
-    @Transactional
-    public void handleDisableAction(WebSocketSession session, Map<String, Object> payload) throws Exception {
-        int merchantId = (int) payload.get("merchantId");
-        String terminal = (String) payload.get("terminal");
-
-        if (terminal == null || terminal.isEmpty() || !terminal.matches("[a-zA-Z]+")) {
-            // Send an error response
-            sendErrorMessage(session,
-                    "Invalid terminal. It must be non-empty and contain only alphabetic characters.");
-            return;
-        }
-
-        // Create the Redis key
-        String redisKey = merchantId + "." + terminal;
-
-        try (Jedis jedis = jedisPool.getResource()) {
-            jedis.watch(redisKey); // Watch the key for changes
-
-            // Retrieve the JSON object from Redis
-            Object terminalJsonObj = jedisPooled.jsonGet(redisKey);
-
-            if (terminalJsonObj == null) {
-                sendErrorMessage(session, "No active session found for terminal " + terminal + ".");
-                jedis.unwatch(); // Unwatch if the data doesn't exist
-                return;
-            }
-
-            // Convert the retrieved Object to a JSON string
-            String terminalJson;
-            try {
-                terminalJson = objectMapper.writeValueAsString(terminalJsonObj);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process session data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            // Deserialize the JSON string into a Map
-            Map<String, Object> existingSessionData;
-            try {
-                existingSessionData = objectMapper.readValue(terminalJson, Map.class);
-            } catch (JsonProcessingException e) {
-                sendErrorMessage(session, "Failed to process session data.");
-                jedis.unwatch(); // Unwatch if processing fails
-                return;
-            }
-
-            // Set isAcceptingOrders to FALSE
-            existingSessionData.put("active", false);
-
-            // Start a transaction and update the Redis entry
-            Transaction transaction = jedis.multi();
-            transaction.jsonSet(redisKey, objectMapper.writeValueAsString(existingSessionData));
-            List<Object> results = transaction.exec(); // Execute the transaction
-
-            if (results == null || results.isEmpty()) {
-                sendErrorMessage(session, "Failed to disable the terminal due to a conflict. Please try again.");
-                return;
-            }
-
-            // Send a success response to the client
-            session.sendMessage(new TextMessage("{\"disable\":\"true\"}"));
-
-            // Notify all terminals of active WebSocket connections
-            notifyTerminalsOfActiveConnections(merchantId);
-        } catch (Exception e) {
-            // Handle any exceptions that occur during the process
-            e.printStackTrace();
-            sendErrorMessage(session, "An error occurred while disabling the terminal. Please try again.");
         }
     }
 
@@ -844,15 +469,16 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
     }
 
-    public void broadcastToMerchant(int merchantId, Map<String, Object> data) throws IOException {
+    public void broadcastToEmployee(int employeeId, Map<String, Object> data) throws IOException {
         // Prepare the data to be broadcasted
         String message = objectMapper.writeValueAsString(data);
 
         // Debug: Print the message that is being broadcasted
-        System.out.println("Broadcasting message to merchant " + merchantId + ": " + message);
+        System.out.println("Broadcasting message to employee " + employeeId + ": " + message);
 
         // Step 1: Scan Redis for keys matching the format merchantId.AlphabeticLetter
-        String pattern = merchantId + ".[a-zA-Z]*";
+        String pattern = String.valueOf(employeeId);
+
         List<String> matchingSessionIds = new ArrayList<>();
 
         try (Jedis jedis = jedisPool.getResource()) {
@@ -876,7 +502,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
         }
 
         // Debug: Print the matching session Ids
-        System.out.println("Matching session Ids for merchant " + merchantId + ": " + matchingSessionIds);
+        System.out.println("Matching session Id for employee " + employeeId + ": " + matchingSessionIds);
 
         // Step 3: Filter the sessionMap to find open sessions that match the retrieved
         // sessionIds

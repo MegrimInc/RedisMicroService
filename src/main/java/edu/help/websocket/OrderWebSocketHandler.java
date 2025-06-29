@@ -139,7 +139,8 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
                 case "arrive":
                     int customerId = (int) payloadMap.get("customerId");
                     int merchantId = (int) payloadMap.get("merchantId");
-                    orderService.arriveOrder( session, merchantId, customerId);
+                    int employeeId = (int) payloadMap.get("employeeId");
+                    orderService.arriveOrder( session, merchantId, customerId, employeeId);
                    
                     break;
                 case "refresh":
@@ -196,7 +197,6 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     public void updateCustomer(Order order) throws IOException {
         // Extract required fields from the Order object
         String status = order.getStatus(); // Get the order status
-        String claimer = order.getTerminal() != null ? order.getTerminal() : ""; // Default to empty if null
         String sessionId = order.getSessionId(); // Retrieve session Id from the order
         int customerId = order.getCustomerId(); // Retrieve customer Id
         String deviceToken = deviceTokenMap.get(String.valueOf(customerId)); // Lookup device token using customerId
@@ -231,12 +231,10 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
             String notificationMessage;
             switch (status.toLowerCase()) {
                 case "unready":
-                    notificationMessage = claimer.isEmpty()
-                            ? "Your order has been unclaimed."
-                            : "Worker \"" + claimer + "\" has claimed your order!";
+                    notificationMessage = "Your order has been placed!";     
                     break;
                 case "ready":
-                    notificationMessage = "Worker \"" + claimer + "\" has finished your order.";
+                    notificationMessage = "Your order is ready!";
                     break;
                     case "delivered":
                     if (totalPrice > 0) {
@@ -326,11 +324,11 @@ public class OrderWebSocketHandler extends TextWebSocketHandler {
     //     }
     // }
 
-    public void sendArrivedNotification(int customerId, String claimer) {
+    public void sendArrivedNotification(int customerId, int employeeId) {
         String deviceToken = deviceTokenMap.get(String.valueOf(customerId));
         if (deviceToken != null && !deviceToken.isEmpty()) {
             
-            String message = "Worker \"" + claimer + "\" will call your name shortly.";
+            String message = "The employee has been notified";
             sendPushNotification(deviceToken, message);
         } else {
             System.err.println("No device token found for customerId: " + customerId);
