@@ -125,7 +125,7 @@ public class OrderService {
         try {
             // Send order request to PostgreSQL
             OrderResponse orderResponse = restTemplate.postForObject(
-                    FULL_HTTP_PATH + "/order/" + orderRequest.getMerchantId() + "/processOrder",
+                    FULL_HTTP_PATH + "/employee/" + orderRequest.getMerchantId() + "/processOrder",
                     orderRequest,
                     OrderResponse.class);
 

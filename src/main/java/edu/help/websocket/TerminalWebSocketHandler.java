@@ -221,7 +221,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
             // Send the order to PostgreSQL
             restTemplate.postForLocation(
-                    FULL_HTTP_PATH + "/order/save",
+                    FULL_HTTP_PATH + "/employee/save",
                     order);
 
             Map<String, Object> data = new HashMap<>();
@@ -276,7 +276,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
             // Send the order to PostgreSQL
             restTemplate.postForLocation(
-                    FULL_HTTP_PATH + "/order/save",
+                    FULL_HTTP_PATH + "/employee/save",
                     order);
 
             Map<String, Object> data = new HashMap<>();
