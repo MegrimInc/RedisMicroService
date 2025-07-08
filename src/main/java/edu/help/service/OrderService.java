@@ -264,6 +264,9 @@ public class OrderService {
                                     new TypeReference<Map<String, Object>>() {
                                     });
 
+                                 String status = (String) orderMap.get("status");
+                        if ("delivered".equalsIgnoreCase(status) || "canceled".equalsIgnoreCase(status)) continue;
+
                             orderMap.put("sessionId", session.getId());
 
                             // Convert the modified Map back to a JSON string
