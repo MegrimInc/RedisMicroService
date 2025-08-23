@@ -151,7 +151,7 @@ public class OrderService {
                         convertItemsToOrders(orderResponse.getItems()),
                         orderRequest.getPointOfSale(),
                         "unready",
-                        getCurrentTimestamp(),
+                        orderResponse.getTimestamp(),
                         session.getId());
 
                 if (!"error".equals(orderResponse.getMessageType())) {
@@ -234,10 +234,6 @@ public class OrderService {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private String getCurrentTimestamp() {
-        return String.valueOf(System.currentTimeMillis());
     }
 
     public void refreshOrdersForCustomer(int customerId, WebSocketSession session) {

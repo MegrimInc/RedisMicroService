@@ -9,6 +9,7 @@ public class OrderResponse {
     private List<ItemOrder> items;
     private int totalPointPrice;
     private boolean inAppPayments;
+    private String timestamp;
 
     // And also we will need to check on the frontend how it works.
     public OrderResponse() {
@@ -16,7 +17,7 @@ public class OrderResponse {
     }
 
     public OrderResponse(String name, String message, double totalPrice, double totalGratuity, double totalServiceFee,
-            double totalTax, List<ItemOrder> items, String messageType, int totalPointPrice, boolean inAppPayments) {
+            double totalTax, List<ItemOrder> items, String messageType, int totalPointPrice, boolean inAppPayments, String timestamp) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.totalGratuity = totalGratuity; // Updated initialization
@@ -27,10 +28,11 @@ public class OrderResponse {
         this.totalPointPrice = totalPointPrice;
         this.name = name;
         this.inAppPayments = inAppPayments;
+        this.timestamp = timestamp;
     }
 
     public OrderResponse(String name, String message, double totalPrice, double totalGratuity, double totalServiceFee,
-            double totalTax, List<ItemOrder> items, int totalPointPrice, boolean inAppPayments) {
+            double totalTax, List<ItemOrder> items, int totalPointPrice, boolean inAppPayments,  String timestamp) {
         this.message = message;
         this.totalPrice = totalPrice;
         this.totalGratuity = totalGratuity; // Updated initialization
@@ -41,6 +43,7 @@ public class OrderResponse {
         this.totalPointPrice = totalPointPrice;
         this.name = name;
         this.inAppPayments = inAppPayments;
+        this.timestamp = timestamp; 
     }
 
     // Inner class representing a item order

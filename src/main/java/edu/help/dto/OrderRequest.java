@@ -7,7 +7,7 @@ public class OrderRequest {
     private int merchantId;
     private int customerId;
     private List<ItemOrder> items;
-    private boolean isDiscount;
+    private Boolean isDiscount;
     private int employeeId;
     private String pointOfSale;
     private String password;
